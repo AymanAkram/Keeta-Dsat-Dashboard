@@ -378,14 +378,14 @@
 
   <div class="sec">Agent Ranking Table — CSAT % / DSAT %</div>
   <div class="card">
-    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
+    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. "Needed for Target" = extra CSAT (4/5) cases the agent needs, on top of current volume, to reach 70% CSAT. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
     <div class="tbl-wrap">
       <table>
         <thead>
           <tr>
             <th>#</th><th>Agent</th><th>Team Leader</th><th>AM</th>
             <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Top FAQs</th>
+            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Needed for Target</th><th>Top FAQs</th>
           </tr>
         </thead>
         <tbody id="agentTableBody"></tbody>
@@ -877,6 +877,18 @@ function renderAgentTable(scoped, dsatCases) {
     const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
     const hitTarget = a.csatPct >= CSAT_TARGET;
     const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
+    // How many MORE consecutive CSAT (rate 4/5) cases this agent needs, on top of their
+    // current volume, before csatPct crosses CSAT_TARGET. Each new case counts toward
+    // both the CSAT numerator and the rated-total denominator.
+    const T = CSAT_TARGET / 100;
+    const csatCount = a.counts[4] + a.counts[5];
+    let neededCell;
+    if (hitTarget) {
+      neededCell = `<span style="color:var(--muted)">—</span>`;
+    } else {
+      const needed = Math.ceil((T * a.grandTotal - csatCount) / (1 - T));
+      neededCell = `<span style="font-weight:700;color:#ffa726">+${needed}</span>`;
+    }
     const tr = document.createElement('tr');
     tr.className = 'trow';
     tr.dataset.agent = a.agent;
@@ -890,6 +902,7 @@ function renderAgentTable(scoped, dsatCases) {
       <td><span class="pctval dsat">${a.dsatPct.toFixed(1)}%</span> ${lowVolFlag}</td>
       <td><span class="pctval csat">${a.csatPct.toFixed(1)}%</span></td>
       <td>${targetBadge}</td>
+      <td>${neededCell}</td>
       <td>${chips}</td>`;
     tr.addEventListener('click', ()=> openAgentPanel(a.agent, dsatCases));
     tbody.appendChild(tr);

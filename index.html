@@ -303,11 +303,11 @@
   </div>
 
   <!-- FAQ CHARTS -->
-  <div class="sec">FAQ Risk Analysis — Lowest CSAT % by Topic (true risk)</div>
+  <div class="sec">FAQ Risk Analysis — DSAT Count by Topic (most to least)</div>
   <div class="card" style="margin-bottom:22px;">
-    <div class="card-t">Lowest-CSAT FAQ Topics (real risk)</div>
-    <div class="card-s">CSAT ÷ total rated cases per topic — a topic with a high DSAT count but strong overall CSAT is less concerning than one with low DSAT but weak CSAT. DSAT case count shown at the end of each bar. <span class="lowvol">⚠</span> = fewer than 10 rated cases, less reliable</div>
-    <div style="position:relative;height:520px">
+    <div class="card-t">FAQ Topics Ranked by DSAT Volume</div>
+    <div class="card-s">Sorted from most DSAT cases to least. Bar color reflects CSAT% risk (red = weak CSAT, green = healthy) — DSAT case count shown at the end of each bar. <span class="lowvol">⚠</span> = fewer than 10 rated cases, less reliable</div>
+    <div style="position:relative;" id="faqBarChartWrap">
       <canvas id="faqBarChart"></canvas>
     </div>
   </div>
@@ -761,17 +761,20 @@ function buildFaqStats(scoped) {
 }
 
 function renderFAQCharts(scoped, dsatCases) {
-  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0);
-  // True risk = lowest CSAT%, not highest DSAT% — a topic can have a big raw DSAT count
-  // yet still be mostly satisfied overall (high CSAT%), while another topic with fewer
-  // DSAT cases but weak CSAT% (lots of neutral/3s dragging satisfaction down) is the
-  // one that actually needs attention.
-  const worst15 = faqStats.slice().sort((a,b)=>a.csatPct-b.csatPct).slice(0,15);
-  const faqColors = worst15.map(f=>f.grandTotal<10?'#546e7a':f.csatPct<40?'#ef5350':f.csatPct<55?'#ff7043':f.csatPct<CSAT_TARGET?'#ffa726':'#66bb6a');
+  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0 && f.dsatCount>0);
+  // Sorted by raw DSAT volume (most to least) so the chart reads naturally top-to-bottom.
+  // Bar color still flags true risk via CSAT% (red = weak CSAT even if count is small,
+  // green = healthy CSAT despite a high DSAT count) — CSAT% shown at the end of each bar.
+  const allFaqs = faqStats.slice().sort((a,b)=>b.dsatCount-a.dsatCount);
+  const faqColors = allFaqs.map(f=>f.grandTotal<10?'#546e7a':f.csatPct<40?'#ef5350':f.csatPct<55?'#ff7043':f.csatPct<CSAT_TARGET?'#ffa726':'#66bb6a');
 
-  // Draws the raw DSAT case count just past the end of each horizontal bar
-  const dsatCountLabelPlugin = {
-    id: 'dsatCountLabel',
+  // Stretch the chart's height to fit every topic instead of capping at a fixed size
+  const wrap = document.getElementById('faqBarChartWrap');
+  wrap.style.height = Math.max(400, allFaqs.length * 30) + 'px';
+
+  // Draws CSAT% just past the end of each horizontal bar
+  const csatLabelPlugin = {
+    id: 'csatLabel',
     afterDatasetsDraw(chart) {
       const { ctx } = chart;
       const meta = chart.getDatasetMeta(0);
@@ -781,7 +784,7 @@ function renderFAQCharts(scoped, dsatCases) {
       ctx.textBaseline = 'middle';
       meta.data.forEach((bar, i) => {
         ctx.fillStyle = '#c9cde0';
-        ctx.fillText(`${worst15[i].counts[1]} DSAT`, bar.x + 6, bar.y);
+        ctx.fillText(`${allFaqs[i].counts[1]} DSAT · ${allFaqs[i].csatPct.toFixed(0)}% CSAT`, bar.x + 6, bar.y);
       });
       ctx.restore();
     }
@@ -790,17 +793,17 @@ function renderFAQCharts(scoped, dsatCases) {
   destroyChart(faqBarChartInst);
   faqBarChartInst = new Chart(document.getElementById('faqBarChart'), {
     type:'bar',
-    data: { labels: worst15.map(d=>d.faq.length>35?d.faq.slice(0,33)+'…':d.faq), datasets:[{ data:worst15.map(d=>d.csatPct.toFixed(1)), backgroundColor:faqColors, borderRadius:5, borderSkipped:false }] },
-    plugins: [dsatCountLabelPlugin],
+    data: { labels: allFaqs.map(d=>d.faq.length>35?d.faq.slice(0,33)+'…':d.faq), datasets:[{ data:allFaqs.map(d=>d.dsatCount), backgroundColor:faqColors, borderRadius:5, borderSkipped:false }] },
+    plugins: [csatLabelPlugin],
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      layout:{ padding:{ right:56 } },
-      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const f=worst15[ctx.dataIndex]; return ` CSAT ${f.csatPct.toFixed(1)}% · DSAT ${f.dsatPct.toFixed(1)}% (${f.counts[1]} DSAT / ${f.grandTotal} rated)${f.grandTotal<10?' ⚠ low volume':''}`; } } } },
-      scales:{ x:{ grid:{color:'#2a2d45'}, ticks:{font:{size:11}, callback:v=>v+'%'}, max:100 }, y:{ grid:{display:false}, ticks:{font:{size:11}} } },
+      layout:{ padding:{ right:90 } },
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const f=allFaqs[ctx.dataIndex]; return ` ${f.counts[1]} DSAT cases · CSAT ${f.csatPct.toFixed(1)}% · DSAT ${f.dsatPct.toFixed(1)}% (of ${f.grandTotal} rated)${f.grandTotal<10?' ⚠ low volume':''}`; } } } },
+      scales:{ x:{ grid:{color:'#2a2d45'}, ticks:{font:{size:11}}, title:{display:true,text:'DSAT case count',color:'#7b82a0',font:{size:10}} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } },
       onClick(evt, elements) {
         if (!elements.length) return;
         const idx = elements[0].index;
-        const faqLabel = worst15[idx].faq;
+        const faqLabel = allFaqs[idx].faq;
         const faqCases = dsatCases.filter(c=>c.faq===faqLabel);
         openPanel({ label: faqLabel, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} with this FAQ` });
       }

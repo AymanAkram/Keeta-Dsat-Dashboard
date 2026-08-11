@@ -264,7 +264,7 @@
     </div>
     <div class="kpi-card purple">
       <div class="kpi-icon">📋</div>
-      <div class="kpi-label">Unique FAQ Types</div>
+      <div class="kpi-label">Real-Risk FAQ Topics</div>
       <div class="kpi-value purple" id="kpiFaq">0</div>
       <div class="kpi-sub" id="kpiFaqSub">—</div>
     </div>
@@ -717,11 +717,11 @@ function renderKPIs(scoped, dsatCases) {
   document.getElementById('kpiPeak').textContent = peakVal;
   document.getElementById('kpiPeakSub').textContent = peakDay ? `${peakDay} — peak day` : '—';
 
-  const faqs = new Set(dsatCases.map(c=>c.faq));
-  document.getElementById('kpiFaq').textContent = faqs.size;
-  const faqCounts = groupCount(dsatCases, 'faq');
-  const topFaq = Object.keys(faqCounts).sort((a,b)=>faqCounts[b]-faqCounts[a])[0];
-  document.getElementById('kpiFaqSub').textContent = topFaq ? `${topFaq.length>28?topFaq.slice(0,26)+'…':topFaq} tops at ${dsatCases.length?((faqCounts[topFaq]/dsatCases.length)*100).toFixed(1):0}%` : '—';
+  const faqStatsForKpi = buildFaqStats(scoped).filter(f=>f.grandTotal>0);
+  const riskFaqsForKpi = faqStatsForKpi.filter(f => f.dsatPct >= f.csatPct).sort((a,b)=>b.dsatCount-a.dsatCount);
+  document.getElementById('kpiFaq').textContent = riskFaqsForKpi.length;
+  const topRiskFaq = riskFaqsForKpi[0];
+  document.getElementById('kpiFaqSub').textContent = topRiskFaq ? `${topRiskFaq.faq.length>26?topRiskFaq.faq.slice(0,24)+'…':topRiskFaq.faq} tops at ${topRiskFaq.dsatCount} DSAT cases (${topRiskFaq.dsatPct.toFixed(1)}%)` : 'No real-risk topics found';
 
   const stats = computeRateStats(scoped);
   document.getElementById('kpiDsatPct').textContent = stats.dsatPct.toFixed(1) + '%';
@@ -793,14 +793,18 @@ function dateLabelToDate(dlabel) {
   return new Date(2026, Number(mm)-1, Number(dd));
 }
 function getWeekLabel(dlabel) {
-  const d = dateLabelToDate(dlabel);
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const diffToMonday = (day === 0 ? -6 : 1) - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diffToMonday);
-  const dd = String(monday.getDate()).padStart(2,'0');
-  const mm = String(monday.getMonth()+1).padStart(2,'0');
-  return `Week of ${dd}/${mm}`;
+  const days = getFullDayRange();
+  const idx = days.indexOf(dlabel);
+  if (idx === -1) return `Week ?`;
+  const weekNum = Math.floor(idx / 7);
+  const startIdx = weekNum * 7;
+  const endIdx = Math.min(startIdx + 6, days.length - 1);
+  return `Week ${weekNum + 1} (${days[startIdx]}–${days[endIdx]})`;
+}
+function getWeekSortIndex(dlabel) {
+  const days = getFullDayRange();
+  const idx = days.indexOf(dlabel);
+  return idx === -1 ? 0 : Math.floor(idx / 7);
 }
 
 function setTrendGranularity(g) {
@@ -817,11 +821,11 @@ function renderPctTrend(scoped) {
   const buckets = {};
   rated.forEach(r => {
     const key = groupKey(r);
-    if (!buckets[key]) buckets[key] = { counts:{1:0,2:0,3:0,4:0,5:0}, sortDate: dateLabelToDate(r.date) };
+    if (!buckets[key]) buckets[key] = { counts:{1:0,2:0,3:0,4:0,5:0}, sortDate: dateLabelToDate(r.date), sortWeek: getWeekSortIndex(r.date) };
     buckets[key].counts[r.rate]++;
     if (dateLabelToDate(r.date) < buckets[key].sortDate) buckets[key].sortDate = dateLabelToDate(r.date);
   });
-  const labels = Object.keys(buckets).sort((a,b)=>buckets[a].sortDate - buckets[b].sortDate);
+  const labels = Object.keys(buckets).sort((a,b)=> trendGranularity==='week' ? buckets[a].sortWeek - buckets[b].sortWeek : buckets[a].sortDate - buckets[b].sortDate);
   const dsatSeries = labels.map(l => { const c=buckets[l].counts; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t? (c[1]/t*100).toFixed(1) : 0; });
   const csatSeries = labels.map(l => { const c=buckets[l].counts; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t? ((c[4]+c[5])/t*100).toFixed(1) : 0; });
   const volSeries = labels.map(l => { const c=buckets[l].counts; return c[1]+c[2]+c[3]+c[4]+c[5]; });
@@ -999,6 +1003,13 @@ function renderAgentTable(scoped, dsatCases) {
   });
 }
 
+function getDsatColor(pct) {
+  if (pct <= 20) return '#66bb6a';   // green — achieving
+  if (pct <= 30) return '#ffd54f';   // yellow
+  if (pct <= 40) return '#ffa726';   // orange
+  return '#ef5350';                  // red
+}
+
 function renderAmRank() {
   const amNames = Object.keys(hierarchy);
   const amData = amNames.map(am => {
@@ -1010,7 +1021,7 @@ function renderAmRank() {
   destroyChart(amBarChartInst);
   amBarChartInst = new Chart(document.getElementById('amBarChart'), {
     type:'bar',
-    data: { labels: amData.map(a=>a.name), datasets:[{ data:amData.map(a=>a.dsatPct.toFixed(1)), backgroundColor: amData.map(a=>a.name==='Unassigned'?'#546e7a':'#64b5f6'), borderRadius:5, borderSkipped:false }] },
+    data: { labels: amData.map(a=>a.name), datasets:[{ data:amData.map(a=>a.dsatPct.toFixed(1)), backgroundColor: amData.map(a=>a.name==='Unassigned'?'#546e7a':getDsatColor(a.dsatPct)), borderRadius:5, borderSkipped:false }] },
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const a=amData[ctx.dataIndex]; return ` DSAT ${a.dsatPct.toFixed(1)}% (${a.counts[1]}/${a.grandTotal} rated)`; } } } },
@@ -1027,7 +1038,7 @@ function renderAmRank() {
   amData.forEach((a,i)=>{
     const el = document.createElement('div');
     el.className = 'rank-item';
-    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${a.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(a.dsatPct*2.5,100)}%"></div></div><span class="rank-cnt">${a.dsatPct.toFixed(1)}%</span>`;
+    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${a.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(a.dsatPct*2.5,100)}%; background:${a.name==='Unassigned'?'#546e7a':getDsatColor(a.dsatPct)}"></div></div><span class="rank-cnt" style="color:${a.name==='Unassigned'?'#7b82a0':getDsatColor(a.dsatPct)}">${a.dsatPct.toFixed(1)}%</span>`;
     el.addEventListener('click', ()=> drillToAm(a.name));
     listEl.appendChild(el);
   });
@@ -1044,7 +1055,7 @@ function renderTlRank(am) {
   destroyChart(tlBarChartInst);
   tlBarChartInst = new Chart(document.getElementById('tlBarChart'), {
     type:'bar',
-    data: { labels: tlData.map(t=>t.name.length>20?t.name.slice(0,18)+'…':t.name), datasets:[{ data:tlData.map(t=>t.dsatPct.toFixed(1)), backgroundColor: tlData.map(t=>t.name==='Unassigned'?'#546e7a':'#ba68c8'), borderRadius:5, borderSkipped:false }] },
+    data: { labels: tlData.map(t=>t.name.length>20?t.name.slice(0,18)+'…':t.name), datasets:[{ data:tlData.map(t=>t.dsatPct.toFixed(1)), backgroundColor: tlData.map(t=>t.name==='Unassigned'?'#546e7a':getDsatColor(t.dsatPct)), borderRadius:5, borderSkipped:false }] },
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const t=tlData[ctx.dataIndex]; return ` DSAT ${t.dsatPct.toFixed(1)}% (${t.counts[1]}/${t.grandTotal} rated)`; } } } },
@@ -1061,7 +1072,7 @@ function renderTlRank(am) {
   tlData.forEach((t,i)=>{
     const el = document.createElement('div');
     el.className = 'rank-item';
-    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${t.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(t.dsatPct*2.5,100)}%"></div></div><span class="rank-cnt">${t.dsatPct.toFixed(1)}%</span>`;
+    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${t.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(t.dsatPct*2.5,100)}%; background:${t.name==='Unassigned'?'#546e7a':getDsatColor(t.dsatPct)}"></div></div><span class="rank-cnt" style="color:${t.name==='Unassigned'?'#7b82a0':getDsatColor(t.dsatPct)}">${t.dsatPct.toFixed(1)}%</span>`;
     el.addEventListener('click', ()=> drillToTl(am, t.name));
     listEl.appendChild(el);
   });

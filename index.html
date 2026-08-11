@@ -396,14 +396,14 @@
 
   <div class="sec">Agent Ranking Table — CSAT % / DSAT %</div>
   <div class="card">
-    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
+    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. "Hits to Achieve" = extra consecutive CSAT ratings (4 or 5) needed to reach target, assuming no new DSAT come in. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
     <div class="tbl-wrap">
       <table>
         <thead>
           <tr>
             <th>#</th><th>Agent</th><th>Team Leader</th><th>AM</th>
             <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Top FAQs</th>
+            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Hits to Achieve</th><th>Top FAQs</th>
           </tr>
         </thead>
         <tbody id="agentTableBody"></tbody>
@@ -420,6 +420,16 @@
 // ═══════════════════════════════════════════
 let ALL_RECORDS = [];      // every row (any rate 1-5 or unrated), deduped by case_id
 const CSAT_TARGET = 70;    // target CSAT% threshold
+
+function computeHitsToAchieve(csatCount, grandTotal, targetPct) {
+  // How many more consecutive CSAT (rate 4/5) responses are needed (each also adding to total)
+  // for csatCount/grandTotal to reach targetPct, assuming no new DSAT responses arrive meanwhile.
+  const target = targetPct / 100;
+  if (grandTotal === 0) return 0;
+  if (csatCount / grandTotal >= target) return 0;
+  const needed = (target * grandTotal - csatCount) / (1 - target);
+  return Math.max(0, Math.ceil(needed));
+}
 let currentAM = 'ALL';
 let currentTL = 'ALL';
 let currentAgent = 'ALL';
@@ -837,6 +847,35 @@ function renderPctTrend(scoped) {
   const volSeries = labels.map(l => { const c=buckets[l].counts; return c[1]+c[2]+c[3]+c[4]+c[5]; });
 
   destroyChart(pctTrendChartInst);
+  const weekMarkerPlugin = {
+    id: 'weekMarkerPlugin',
+    afterDraw(chart) {
+      if (trendGranularity !== 'day') return;
+      const { ctx, chartArea, scales } = chart;
+      const fullDays = getFullDayRange();
+      ctx.save();
+      labels.forEach((label, i) => {
+        const idx = fullDays.indexOf(label);
+        if (idx > 0 && idx % 7 === 0) {
+          const weekNum = Math.floor(idx / 7) + 1;
+          const x = scales.x.getPixelForValue(i);
+          ctx.beginPath();
+          ctx.setLineDash([4,4]);
+          ctx.strokeStyle = 'rgba(186,104,200,0.55)';
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(x, chartArea.top);
+          ctx.lineTo(x, chartArea.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ba68c8';
+          ctx.font = '10px Segoe UI';
+          ctx.textAlign = 'center';
+          ctx.fillText(`Week ${weekNum}`, x, chartArea.top - 4);
+        }
+      });
+      ctx.restore();
+    }
+  };
   pctTrendChartInst = new Chart(document.getElementById('pctTrendChart'), {
     type: 'line',
     data: {
@@ -847,8 +886,10 @@ function renderPctTrend(scoped) {
         { label:'CSAT Target', data:labels.map(()=>CSAT_TARGET), borderColor:'rgba(255,213,79,.6)', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false }
       ]
     },
+    plugins: [weekMarkerPlugin],
     options: {
       responsive:true, maintainAspectRatio:false,
+      layout: { padding: { top: trendGranularity==='day' ? 16 : 0 } },
       plugins: {
         legend:{ position:'top', labels:{ font:{size:11}, boxWidth:12, padding:14 } },
         tooltip:{ callbacks:{ afterBody: ctx => `${volSeries[ctx[0].dataIndex]} rated surveys` } }
@@ -992,6 +1033,8 @@ function renderAgentTable(scoped, dsatCases) {
     const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
     const hitTarget = a.csatPct >= CSAT_TARGET;
     const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
+    const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, CSAT_TARGET);
+    const hitsCell = hitTarget ? `<span style="color:#66bb6a;font-weight:700;">—</span>` : `<span style="color:#ffd54f;font-weight:700;">+${hitsNeeded} CSAT</span>`;
     const tr = document.createElement('tr');
     tr.className = 'trow';
     tr.dataset.agent = a.agent;
@@ -1005,6 +1048,7 @@ function renderAgentTable(scoped, dsatCases) {
       <td><span class="pctval dsat">${a.dsatPct.toFixed(1)}%</span> ${lowVolFlag}</td>
       <td><span class="pctval csat">${a.csatPct.toFixed(1)}%</span></td>
       <td>${targetBadge}</td>
+      <td>${hitsCell}</td>
       <td>${chips}</td>`;
     tr.addEventListener('click', ()=> openAgentPanel(a.agent, dsatCases));
     tbody.appendChild(tr);
@@ -1012,10 +1056,14 @@ function renderAgentTable(scoped, dsatCases) {
 }
 
 function getDsatColor(pct) {
-  if (pct <= 20) return '#66bb6a';   // green — achieving
-  if (pct <= 30) return '#ffd54f';   // yellow
-  if (pct <= 40) return '#ffa726';   // orange
-  return '#ef5350';                  // red
+  // Continuous gradient: green at <=20% (achieving), red at >=50%, smooth in between
+  const GREEN = [102,187,106], RED = [239,83,80];
+  if (pct <= 20) return `rgb(${GREEN[0]},${GREEN[1]},${GREEN[2]})`;
+  const t = Math.max(0, Math.min((pct - 20) / (50 - 20), 1));
+  const r = Math.round(GREEN[0] + (RED[0]-GREEN[0])*t);
+  const g = Math.round(GREEN[1] + (RED[1]-GREEN[1])*t);
+  const b = Math.round(GREEN[2] + (RED[2]-GREEN[2])*t);
+  return `rgb(${r},${g},${b})`;
 }
 
 function renderAmRank() {

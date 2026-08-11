@@ -388,8 +388,8 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-t">Full FAQ List — Ranked by DSAT %</div>
-      <div class="card-s">Hover for the raw numbers behind each percentage — click to filter</div>
+      <div class="card-t">Full FAQ List — Ranked by DSAT Volume</div>
+      <div class="card-s">Same real-risk filter as the chart (DSAT % ≥ CSAT %) — hover for details, click to filter</div>
       <div id="faqFullList" style="max-height:360px;overflow-y:auto;"></div>
     </div>
   </div>
@@ -731,8 +731,10 @@ function renderKPIs(scoped, dsatCases) {
   document.getElementById('kpiCsatPctSub').textContent = `${stats.counts[4]+stats.counts[5]} rate-4/5 ÷ ${stats.grandTotal} rated`;
 }
 
-function getFullDayRange() {
-  if (!ALL_RECORDS.length) return [];
+let FULL_DAY_RANGE_CACHE = [];
+
+function computeFullDayRange() {
+  if (!ALL_RECORDS.length) { FULL_DAY_RANGE_CACHE = []; return; }
   let minD = null, maxD = null;
   ALL_RECORDS.forEach(r => {
     const d = dateLabelToDate(r.date);
@@ -747,7 +749,11 @@ function getFullDayRange() {
     days.push(`${dd}/${mm}`);
     cur.setDate(cur.getDate()+1);
   }
-  return days;
+  FULL_DAY_RANGE_CACHE = days;
+}
+
+function getFullDayRange() {
+  return FULL_DAY_RANGE_CACHE;
 }
 
 function renderTrend(dsatCases) {
@@ -914,21 +920,23 @@ function renderFAQCharts(scoped, dsatCases) {
 }
 
 function renderFAQList(scoped, dsatCases) {
-  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct);
+  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0);
+  const riskFaqs = faqStats.filter(f => f.dsatPct >= f.csatPct).sort((a,b)=>b.dsatCount-a.dsatCount);
   const listEl = document.getElementById('faqFullList');
   listEl.innerHTML = '';
-  faqStats.forEach((d,i)=>{
-    const pct = Math.min(d.dsatPct*2.5,100).toFixed(0);
+  const maxCount = riskFaqs.length ? riskFaqs[0].dsatCount : 1;
+  riskFaqs.forEach((d,i)=>{
+    const pct = ((d.dsatCount/maxCount)*100).toFixed(0);
     const lowVol = d.grandTotal < 10 ? ' <span class="lowvol">⚠</span>' : '';
     const el = document.createElement('div');
     el.className = 'faq-item';
-    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt">${d.dsatPct.toFixed(1)}%</span>`;
-    el.title = `${d.counts[1]} DSAT out of ${d.grandTotal} rated cases`;
+    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt">${d.dsatCount}</span>`;
+    el.title = `${d.dsatCount} DSAT cases — DSAT ${d.dsatPct.toFixed(1)}% vs CSAT ${d.csatPct.toFixed(1)}% (${d.grandTotal} rated)`;
     el.addEventListener('click', ()=> {
       document.querySelectorAll('.faq-item').forEach(x=>x.classList.remove('active'));
       el.classList.add('active');
       const faqCases = dsatCases.filter(c=>c.faq===d.faq);
-      openPanel({ label: d.faq, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} — DSAT rate ${d.dsatPct.toFixed(1)}% of ${d.grandTotal} rated cases` });
+      openPanel({ label: d.faq, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} — DSAT ${d.dsatPct.toFixed(1)}% vs CSAT ${d.csatPct.toFixed(1)}% of ${d.grandTotal} rated cases` });
     });
     listEl.appendChild(el);
   });
@@ -1129,6 +1137,7 @@ function applyNewRecords(records, sourceLabel) {
   if (!records.length) throw new Error('لم يتم العثور على أي صفوف صالحة في المصدر');
   ALL_RECORDS = records;
   buildHierarchy();
+  computeFullDayRange();
   currentAM = 'ALL';
   currentTL = 'ALL';
   currentAgent = 'ALL';

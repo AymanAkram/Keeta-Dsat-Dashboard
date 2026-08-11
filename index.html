@@ -302,16 +302,42 @@
     </div>
   </div>
 
-  <!-- FAQ CHARTS -->
-  <div class="sec">FAQ Risk Analysis — DSAT Count by Topic (most to least)</div>
-  <div class="card" style="margin-bottom:22px;">
-    <div class="card-t">FAQ Topics Ranked by DSAT Volume</div>
-    <div class="card-s">Sorted from most DSAT cases to least. Bar color reflects CSAT% risk (red = weak CSAT, green = healthy) — DSAT case count shown at the end of each bar. <span class="lowvol">⚠</span> = fewer than 10 rated cases, less reliable</div>
-    <div style="position:relative;" id="faqBarChartWrap">
-      <canvas id="faqBarChart"></canvas>
+  <!-- CSAT vs DSAT % TREND (IMPROVEMENT TRACKING) -->
+  <div class="sec">CSAT % vs DSAT % Trend — Improvement Tracking</div>
+  <div class="card trend-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+      <div>
+        <div class="card-t" id="pctTrendTitle">CSAT % vs DSAT % Over Time</div>
+        <div class="card-s" style="margin-bottom:0;">Scoped to current selection above (Floor / AM / TL / Agent) — green rising &amp; red falling means improvement</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="reset-btn" id="granDayBtn" onclick="setTrendGranularity('day')" style="background:rgba(100,181,246,.25)">Daily</button>
+        <button class="reset-btn" id="granWeekBtn" onclick="setTrendGranularity('week')">Weekly</button>
+      </div>
+    </div>
+    <div style="position:relative;height:240px; margin-top:12px;">
+      <canvas id="pctTrendChart"></canvas>
     </div>
   </div>
 
+  <!-- FAQ CHARTS -->
+  <div class="sec">FAQ Risk Analysis — DSAT % by Topic</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-t">Highest-Risk FAQ Topics (DSAT %)</div>
+      <div class="card-s">Top 12 real problem topics — excludes topics where CSAT beats DSAT by 20pts+ (not a real issue). <span class="lowvol">⚠</span> = fewer than 10 rated cases, less reliable</div>
+      <div style="position:relative;height:340px">
+        <canvas id="faqBarChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-t">Share of DSAT Complaint Volume</div>
+      <div class="card-s">Which topics make up most of the raw complaints — top categories + minor others</div>
+      <div style="position:relative;height:340px">
+        <canvas id="faqDonut"></canvas>
+      </div>
+    </div>
+  </div>
 
   <!-- AM RANKING (Whole Floor only) -->
   <div id="amRankSection" style="display:none;">
@@ -362,22 +388,22 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-t">Full FAQ List — Ranked by Lowest CSAT %</div>
-      <div class="card-s">Sorted worst-CSAT-first — the real risk list. Hover for DSAT breakdown — click to filter</div>
+      <div class="card-t">Full FAQ List — Ranked by DSAT %</div>
+      <div class="card-s">Hover for the raw numbers behind each percentage — click to filter</div>
       <div id="faqFullList" style="max-height:360px;overflow-y:auto;"></div>
     </div>
   </div>
 
   <div class="sec">Agent Ranking Table — CSAT % / DSAT %</div>
   <div class="card">
-    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. "Needed for Target" = extra CSAT (4/5) cases the agent needs, on top of current volume, to reach 70% CSAT. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
+    <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)">70%</b>. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
     <div class="tbl-wrap">
       <table>
         <thead>
           <tr>
             <th>#</th><th>Agent</th><th>Team Leader</th><th>AM</th>
             <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Needed for Target</th><th>Top FAQs</th>
+            <th>Total Rated</th><th>DSAT %</th><th>CSAT %</th><th>Target</th><th>Top FAQs</th>
           </tr>
         </thead>
         <tbody id="agentTableBody"></tbody>
@@ -397,7 +423,8 @@ const CSAT_TARGET = 70;    // target CSAT% threshold
 let currentAM = 'ALL';
 let currentTL = 'ALL';
 let currentAgent = 'ALL';
-let trendChart, faqBarChartInst, agentBarChartInst, tlBarChartInst, amBarChartInst;
+let trendChart, faqBarChartInst, faqDonutInst, agentBarChartInst, tlBarChartInst, amBarChartInst, pctTrendChartInst;
+let trendGranularity = 'day'; // 'day' | 'week'
 let hierarchy = {};         // { amName: Set(tlNames) }
 let tlAgents = {};          // { "am|tl": Set(agentNames) }
 let sheetUrl = '';
@@ -655,6 +682,7 @@ function applyFilters() {
 
   renderKPIs(scoped, dsatCases);
   renderTrend(dsatCases);
+  renderPctTrend(scoped);
   renderFAQCharts(scoped, dsatCases);
   renderFAQList(scoped, dsatCases);
   renderAgentChart(scoped, dsatCases);
@@ -741,6 +769,69 @@ function renderTrend(dsatCases) {
   });
 }
 
+// ═══════════════════════════════════════════
+// CSAT vs DSAT % TREND (day/week, tracks improvement)
+// ═══════════════════════════════════════════
+function dateLabelToDate(dlabel) {
+  const [dd, mm] = dlabel.split('/');
+  return new Date(2026, Number(mm)-1, Number(dd));
+}
+function getWeekLabel(dlabel) {
+  const d = dateLabelToDate(dlabel);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diffToMonday);
+  const dd = String(monday.getDate()).padStart(2,'0');
+  const mm = String(monday.getMonth()+1).padStart(2,'0');
+  return `Week of ${dd}/${mm}`;
+}
+
+function setTrendGranularity(g) {
+  trendGranularity = g;
+  document.getElementById('granDayBtn').style.background = g==='day' ? 'rgba(100,181,246,.25)' : '';
+  document.getElementById('granWeekBtn').style.background = g==='week' ? 'rgba(100,181,246,.25)' : '';
+  const scoped = getScopedRecords(currentAM, currentTL, currentAgent);
+  renderPctTrend(scoped);
+}
+
+function renderPctTrend(scoped) {
+  const rated = scoped.filter(r => r.rate);
+  const groupKey = trendGranularity === 'week' ? (r => getWeekLabel(r.date)) : (r => r.date);
+  const buckets = {};
+  rated.forEach(r => {
+    const key = groupKey(r);
+    if (!buckets[key]) buckets[key] = { counts:{1:0,2:0,3:0,4:0,5:0}, sortDate: dateLabelToDate(r.date) };
+    buckets[key].counts[r.rate]++;
+    if (dateLabelToDate(r.date) < buckets[key].sortDate) buckets[key].sortDate = dateLabelToDate(r.date);
+  });
+  const labels = Object.keys(buckets).sort((a,b)=>buckets[a].sortDate - buckets[b].sortDate);
+  const dsatSeries = labels.map(l => { const c=buckets[l].counts; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t? (c[1]/t*100).toFixed(1) : 0; });
+  const csatSeries = labels.map(l => { const c=buckets[l].counts; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t? ((c[4]+c[5])/t*100).toFixed(1) : 0; });
+  const volSeries = labels.map(l => { const c=buckets[l].counts; return c[1]+c[2]+c[3]+c[4]+c[5]; });
+
+  destroyChart(pctTrendChartInst);
+  pctTrendChartInst = new Chart(document.getElementById('pctTrendChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'CSAT %', data:csatSeries, borderColor:'#66bb6a', backgroundColor:'rgba(102,187,106,.12)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#66bb6a', tension:0.35, fill:true },
+        { label:'DSAT %', data:dsatSeries, borderColor:'#ef5350', backgroundColor:'rgba(239,83,80,.10)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#ef5350', tension:0.35, fill:true },
+        { label:'CSAT Target', data:labels.map(()=>CSAT_TARGET), borderColor:'rgba(255,213,79,.6)', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{ position:'top', labels:{ font:{size:11}, boxWidth:12, padding:14 } },
+        tooltip:{ callbacks:{ afterBody: ctx => `${volSeries[ctx[0].dataIndex]} rated surveys` } }
+      },
+      scales: { x:{ grid:{display:false}, ticks:{font:{size:10.5}} }, y:{ grid:{color:'#2a2d45'}, ticks:{font:{size:11}, callback:v=>v+'%'}, min:0, max:100 } }
+    }
+  });
+}
+
 function buildFaqStats(scoped) {
   const byFaq = {};
   scoped.forEach(r => {
@@ -760,74 +851,64 @@ function buildFaqStats(scoped) {
   });
 }
 
+const NOT_A_PROBLEM_GAP = 20; // if CSAT% - DSAT% >= this, the topic isn't flagged as a real problem
+const FAQ_CHART_LIMIT = 12;
+
 function renderFAQCharts(scoped, dsatCases) {
-  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0 && f.dsatCount>0);
-  // Sorted by raw DSAT volume (most to least) so the chart reads naturally top-to-bottom.
-  // Bar color still flags true risk via CSAT% (red = weak CSAT even if count is small,
-  // green = healthy CSAT despite a high DSAT count) — CSAT% shown at the end of each bar.
-  const allFaqs = faqStats.slice().sort((a,b)=>b.dsatCount-a.dsatCount);
-  const faqColors = allFaqs.map(f=>f.grandTotal<10?'#546e7a':f.csatPct<40?'#ef5350':f.csatPct<55?'#ff7043':f.csatPct<CSAT_TARGET?'#ffa726':'#66bb6a');
-
-  // Stretch the chart's height to fit every topic instead of capping at a fixed size
-  const wrap = document.getElementById('faqBarChartWrap');
-  wrap.style.height = Math.max(400, allFaqs.length * 30) + 'px';
-
-  // Draws CSAT% just past the end of each horizontal bar
-  const csatLabelPlugin = {
-    id: 'csatLabel',
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      const meta = chart.getDatasetMeta(0);
-      ctx.save();
-      ctx.font = '700 11px Segoe UI, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      meta.data.forEach((bar, i) => {
-        ctx.fillStyle = '#c9cde0';
-        ctx.fillText(`${allFaqs[i].counts[1]} DSAT · ${allFaqs[i].csatPct.toFixed(0)}% CSAT`, bar.x + 6, bar.y);
-      });
-      ctx.restore();
-    }
-  };
+  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0);
+  const total = dsatCases.length;
+  const riskFaqs = faqStats.filter(f => (f.csatPct - f.dsatPct) < NOT_A_PROBLEM_GAP);
+  const top15 = riskFaqs.slice().sort((a,b)=>b.dsatPct-a.dsatPct).slice(0, FAQ_CHART_LIMIT);
+  const faqColors = top15.map(f=>f.grandTotal<10?'#546e7a':f.dsatPct>=25?'#ef5350':f.dsatPct>=15?'#ff7043':f.dsatPct>=8?'#ffa726':'#ffd54f');
 
   destroyChart(faqBarChartInst);
   faqBarChartInst = new Chart(document.getElementById('faqBarChart'), {
     type:'bar',
-    data: { labels: allFaqs.map(d=>d.faq.length>35?d.faq.slice(0,33)+'…':d.faq), datasets:[{ data:allFaqs.map(d=>d.dsatCount), backgroundColor:faqColors, borderRadius:5, borderSkipped:false }] },
-    plugins: [csatLabelPlugin],
+    data: { labels: top15.map(d=>d.faq.length>35?d.faq.slice(0,33)+'…':d.faq), datasets:[{ data:top15.map(d=>d.dsatPct.toFixed(1)), backgroundColor:faqColors, borderRadius:5, borderSkipped:false }] },
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      layout:{ padding:{ right:90 } },
-      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const f=allFaqs[ctx.dataIndex]; return ` ${f.counts[1]} DSAT cases · CSAT ${f.csatPct.toFixed(1)}% · DSAT ${f.dsatPct.toFixed(1)}% (of ${f.grandTotal} rated)${f.grandTotal<10?' ⚠ low volume':''}`; } } } },
-      scales:{ x:{ grid:{color:'#2a2d45'}, ticks:{font:{size:11}}, title:{display:true,text:'DSAT case count',color:'#7b82a0',font:{size:10}} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } },
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>{ const f=top15[ctx.dataIndex]; return ` DSAT ${f.dsatPct.toFixed(1)}% · CSAT ${f.csatPct.toFixed(1)}% (${f.counts[1]}/${f.grandTotal} rated)${f.grandTotal<10?' ⚠ low volume':''}`; } } } },
+      scales:{ x:{ grid:{color:'#2a2d45'}, ticks:{font:{size:11}, callback:v=>v+'%'} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } },
       onClick(evt, elements) {
         if (!elements.length) return;
         const idx = elements[0].index;
-        const faqLabel = allFaqs[idx].faq;
+        const faqLabel = top15[idx].faq;
         const faqCases = dsatCases.filter(c=>c.faq===faqLabel);
         openPanel({ label: faqLabel, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} with this FAQ` });
       }
     }
   });
+
+  // Donut stays volume-based: share of DSAT complaints by topic (distinct from risk % above)
+  const volSorted = faqStats.slice().sort((a,b)=>b.dsatCount-a.dsatCount);
+  const top15Vol = volSorted.slice(0,15).filter(f=>f.dsatCount>0);
+  const minorItems = volSorted.slice(15).filter(f=>f.dsatCount>0);
+  const minorCount = minorItems.reduce((s,d)=>s+d.dsatCount,0);
+  const donutColors = ['#ef5350','#e53935','#ff7043','#f57c00','#ffa726','#ffd54f','#c0ca33','#66bb6a','#26a69a','#4db6ac','#42a5f5','#1e88e5','#5c6bc0','#ab47bc','#ec407a','#607d8b'];
+  destroyChart(faqDonutInst);
+  faqDonutInst = new Chart(document.getElementById('faqDonut'), {
+    type:'doughnut',
+    data: { labels:[...top15Vol.map(d=>d.faq.length>26?d.faq.slice(0,24)+'…':d.faq), `Others (${minorItems.length} minor FAQs)`], datasets:[{ data:[...top15Vol.map(d=>d.dsatCount), minorCount], backgroundColor:donutColors, borderWidth:2, borderColor:'#1a1d2e', hoverOffset:8 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'58%', plugins:{ legend:{ position:'bottom', labels:{ font:{size:9.5}, padding:7, boxWidth:10 } }, tooltip:{ callbacks:{ label: ctx=>` ${ctx.label}: ${ctx.parsed} cases (${total?((ctx.parsed/total)*100).toFixed(1):0}% of DSAT volume)` } } } }
+  });
 }
 
 function renderFAQList(scoped, dsatCases) {
-  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0).sort((a,b)=>a.csatPct-b.csatPct);
+  const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct);
   const listEl = document.getElementById('faqFullList');
   listEl.innerHTML = '';
   faqStats.forEach((d,i)=>{
-    const pct = Math.min((100 - d.csatPct) * 1.25, 100).toFixed(0); // bar fills more as CSAT% drops
+    const pct = Math.min(d.dsatPct*2.5,100).toFixed(0);
     const lowVol = d.grandTotal < 10 ? ' <span class="lowvol">⚠</span>' : '';
-    const cntColor = d.grandTotal<10 ? 'var(--muted)' : d.csatPct<40 ? '#ef5350' : d.csatPct<55 ? '#ff7043' : d.csatPct<CSAT_TARGET ? '#ffa726' : '#66bb6a';
     const el = document.createElement('div');
     el.className = 'faq-item';
-    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt" style="color:${cntColor}">${d.csatPct.toFixed(1)}%</span>`;
-    el.title = `CSAT ${d.csatPct.toFixed(1)}% · DSAT ${d.counts[1]} of ${d.grandTotal} rated cases (${d.dsatPct.toFixed(1)}%)`;
+    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt">${d.dsatPct.toFixed(1)}%</span>`;
+    el.title = `${d.counts[1]} DSAT out of ${d.grandTotal} rated cases`;
     el.addEventListener('click', ()=> {
       document.querySelectorAll('.faq-item').forEach(x=>x.classList.remove('active'));
       el.classList.add('active');
       const faqCases = dsatCases.filter(c=>c.faq===d.faq);
-      openPanel({ label: d.faq, cases: faqCases, icon:'📋', sub:`CSAT ${d.csatPct.toFixed(1)}% · DSAT ${d.dsatPct.toFixed(1)}% of ${d.grandTotal} rated cases — ${faqCases.length} DSAT case${faqCases.length!==1?'s':''} shown below` });
+      openPanel({ label: d.faq, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} — DSAT rate ${d.dsatPct.toFixed(1)}% of ${d.grandTotal} rated cases` });
     });
     listEl.appendChild(el);
   });
@@ -883,18 +964,6 @@ function renderAgentTable(scoped, dsatCases) {
     const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
     const hitTarget = a.csatPct >= CSAT_TARGET;
     const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
-    // How many MORE consecutive CSAT (rate 4/5) cases this agent needs, on top of their
-    // current volume, before csatPct crosses CSAT_TARGET. Each new case counts toward
-    // both the CSAT numerator and the rated-total denominator.
-    const T = CSAT_TARGET / 100;
-    const csatCount = a.counts[4] + a.counts[5];
-    let neededCell;
-    if (hitTarget) {
-      neededCell = `<span style="color:var(--muted)">—</span>`;
-    } else {
-      const needed = Math.ceil((T * a.grandTotal - csatCount) / (1 - T));
-      neededCell = `<span style="font-weight:700;color:#ffa726">+${needed}</span>`;
-    }
     const tr = document.createElement('tr');
     tr.className = 'trow';
     tr.dataset.agent = a.agent;
@@ -908,7 +977,6 @@ function renderAgentTable(scoped, dsatCases) {
       <td><span class="pctval dsat">${a.dsatPct.toFixed(1)}%</span> ${lowVolFlag}</td>
       <td><span class="pctval csat">${a.csatPct.toFixed(1)}%</span></td>
       <td>${targetBadge}</td>
-      <td>${neededCell}</td>
       <td>${chips}</td>`;
     tr.addEventListener('click', ()=> openAgentPanel(a.agent, dsatCases));
     tbody.appendChild(tr);

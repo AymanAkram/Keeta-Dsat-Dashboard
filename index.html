@@ -6,6 +6,7 @@
   <title>Floor DSAT &amp; CSAT Analytics Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body.theme-light {
@@ -97,6 +98,7 @@
 
     /* MAIN */
     .main { padding:24px 36px; }
+    .hidden { display:none !important; }
     .main.hidden { display:none; }
 
     /* KPI */
@@ -132,6 +134,11 @@
 
     /* AGENT TABLE */
     .tbl-wrap { overflow-x:auto; }
+    .tbl-wrap.collapsed { max-height:560px; overflow-y:auto; }
+    .tbl-wrap thead th { position:sticky; top:0; background:var(--surface); z-index:2; box-shadow:0 1px 0 var(--border); }
+    .tbl-toggle-row { text-align:center; padding-top:14px; }
+    .tbl-toggle-btn { background:var(--surface2); border:1px solid var(--border); color:var(--keeta-green,#1c8f70); font-size:12px; font-weight:700; padding:8px 20px; border-radius:8px; cursor:pointer; transition:background .15s; }
+    .tbl-toggle-btn:hover { background:var(--border); }
     table { width:100%; border-collapse:collapse; font-size:12.5px; }
     thead tr { border-bottom:1px solid var(--border); }
     th { text-align:left; font-size:9.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); padding:0 10px 9px; white-space:nowrap; }
@@ -422,17 +429,10 @@
 
   <!-- PERIOD COMPARISON -->
   <div class="sec">Period Comparison</div>
-  <div class="grid2">
-    <div class="card">
-      <div class="card-t">This Week vs Last Week</div>
-      <div class="card-s" id="weekCompareSub">—</div>
-      <div id="weekCompareBody"></div>
-    </div>
-    <div class="card">
-      <div class="card-t">This Month vs Last Month</div>
-      <div class="card-s" id="monthCompareSub">—</div>
-      <div id="monthCompareBody"></div>
-    </div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-t">This Week vs Last Week</div>
+    <div class="card-s" id="weekCompareSub">—</div>
+    <div id="weekCompareBody"></div>
   </div>
 
   <!-- FAQ CHARTS -->
@@ -512,7 +512,7 @@
   <div class="sec" style="align-items:center;">Agent Ranking Table — CSAT % / DSAT % <button class="upload-btn" style="margin-left:8px; white-space:nowrap;" onclick="exportAgentTable()">⬇ Extract</button></div>
   <div class="card">
     <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)" id="tableTargetLbl">72%</b>. "Hits to Achieve" = extra consecutive CSAT ratings (4 or 5) needed to reach target, assuming no new DSAT come in. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap collapsed" id="agentTblWrap">
       <table>
         <thead>
           <tr>
@@ -523,6 +523,9 @@
         </thead>
         <tbody id="agentTableBody"></tbody>
       </table>
+    </div>
+    <div class="tbl-toggle-row">
+      <button class="tbl-toggle-btn" id="agentTblToggleBtn" onclick="toggleAgentTable()">عرض الكل (<span id="agentTblCount">0</span> إيچنت)</button>
     </div>
   </div>
 
@@ -853,7 +856,7 @@ function applyFilters() {
   const agentWeekTrend = computeAgentWeekTrend(scoped);
 
   renderKPIs(scoped, dsatCases, faqStats);
-  renderTrend(dsatCases);
+  renderTrend(dsatCases, scoped);
   renderPctTrend(scoped);
   renderPeriodComparisons(scoped);
   renderFAQCharts(scoped, dsatCases, faqStats);
@@ -928,11 +931,20 @@ function getFullDayRange() {
   return FULL_DAY_RANGE_CACHE;
 }
 
-function renderTrend(dsatCases) {
+function renderTrend(dsatCases, scoped) {
   const daily = groupCount(dsatCases, 'date');
   const days = getFullDayRange();
   const counts = days.map(d=>daily[d]||0);
   const bg = counts.map(v => v>=40?'rgba(229,57,53,0.85)': v>=20?'rgba(245,124,0,0.75)': v>=10?'rgba(255,193,7,0.7)': v>0?'rgba(100,181,246,0.6)':'rgba(40,45,70,0.5)');
+
+  // Per-day total RATED surveys (any rate 1-5), used to compute DSAT % per day
+  const dailyRatedTotal = {};
+  scoped.forEach(r => { if (r.rate) dailyRatedTotal[r.date] = (dailyRatedTotal[r.date]||0) + 1; });
+  const dsatPctByDay = days.map(d => {
+    const total = dailyRatedTotal[d] || 0;
+    const dsat = daily[d] || 0;
+    return total ? (dsat/total*100) : 0;
+  });
 
   destroyChart(trendChart);
   trendChart = new Chart(document.getElementById('trendChart'), {
@@ -956,7 +968,7 @@ function renderTrend(dsatCases) {
       },
       plugins: {
         legend:{ display:false },
-        tooltip:{ callbacks:{ label: ctx => ctx.datasetIndex===1 ? ` ${ctx.parsed.y} DSAT cases — click to drill down` : null, filter: item => item.datasetIndex===1 } }
+        tooltip:{ callbacks:{ label: ctx => ctx.datasetIndex===1 ? ` ${ctx.parsed.y} DSAT cases — DSAT ${dsatPctByDay[ctx.dataIndex].toFixed(1)}% of that day — click to drill down` : null, filter: item => item.datasetIndex===1 } }
       },
       scales: { x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ grid:{color:gridColor()}, ticks:{font:{size:11}}, min:0 } }
     }
@@ -1062,13 +1074,8 @@ function renderPctTrend(scoped) {
 }
 
 // ═══════════════════════════════════════════
-// PERIOD COMPARISON — this week vs last week, this month vs last month
+// PERIOD COMPARISON — this week vs last week
 // ═══════════════════════════════════════════
-function getMonthKey(dlabel) {
-  const d = dateLabelToDate(dlabel);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-}
-
 function buildCompareDelta(cur, prev, higherIsBetter) {
   const diff = cur - prev;
   if (Math.abs(diff) < 0.05) return { cls:'flat', arrow:'→', text:'no change' };
@@ -1092,7 +1099,6 @@ function compareRowHtml(label, curVal, prevVal, unit, higherIsBetter, curColor) 
 
 function renderPeriodComparisons(scoped) {
   renderWeekComparison(scoped);
-  renderMonthComparison(scoped);
 }
 
 function computeAgentWeekTrend(scoped) {
@@ -1167,31 +1173,6 @@ function renderWeekComparison(scoped) {
     compareRowHtml('CSAT %', thisStats.csatPct, lastStats.csatPct, '%', true, 'var(--keeta-green)') +
     compareRowHtml('DSAT Cases', thisStats.counts[1], lastStats.counts[1], '', false, '#ef5350') +
     compareRowHtml('Total Rated Surveys', thisStats.grandTotal, lastStats.grandTotal, '', null, 'var(--subtext)');
-}
-
-function renderMonthComparison(scoped) {
-  const bodyEl = document.getElementById('monthCompareBody');
-  const subEl = document.getElementById('monthCompareSub');
-  const rated = scoped.filter(r => r.rate);
-  const months = Array.from(new Set(rated.map(r => getMonthKey(r.date)))).sort();
-  if (months.length < 2) {
-    bodyEl.innerHTML = '<div class="cmp-empty">Only one month of data available so far. Month-over-month comparison will appear once a second month is in the sheet.</div>';
-    subEl.textContent = months.length ? `Currently only ${months[0]} available` : '—';
-    return;
-  }
-  const curMonth = months[months.length-1];
-  const prevMonth = months[months.length-2];
-  const curRecs = rated.filter(r => getMonthKey(r.date) === curMonth);
-  const prevRecs = rated.filter(r => getMonthKey(r.date) === prevMonth);
-  const curStats = computeRateStats(curRecs);
-  const prevStats = computeRateStats(prevRecs);
-
-  subEl.textContent = `${curMonth} vs ${prevMonth}`;
-  bodyEl.innerHTML =
-    compareRowHtml('DSAT %', curStats.dsatPct, prevStats.dsatPct, '%', false, '#ef5350') +
-    compareRowHtml('CSAT %', curStats.csatPct, prevStats.csatPct, '%', true, 'var(--keeta-green)') +
-    compareRowHtml('DSAT Cases', curStats.counts[1], prevStats.counts[1], '', false, '#ef5350') +
-    compareRowHtml('Total Rated Surveys', curStats.grandTotal, prevStats.grandTotal, '', null, 'var(--subtext)');
 }
 
 function buildFaqStats(scoped) {
@@ -1318,6 +1299,14 @@ function renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend) {
   const agentData = agentStats.slice().sort((a,b)=>b.dsatPct-a.dsatPct);
   const tbody = document.getElementById('agentTableBody');
   tbody.innerHTML = '';
+
+  document.getElementById('agentTblCount').textContent = agentData.length;
+  const wrapEl = document.getElementById('agentTblWrap');
+  const toggleBtn = document.getElementById('agentTblToggleBtn');
+  wrapEl.classList.add('collapsed');
+  toggleBtn.textContent = `عرض الكل (${agentData.length} إيچنت)`;
+  toggleBtn.style.display = agentData.length > 10 ? 'inline-block' : 'none';
+
   agentData.forEach((a,i)=>{
     const rank = i+1;
     const rc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'rn';
@@ -1462,6 +1451,19 @@ function openPanel({ label, cases, icon, sub }) {
 
 const SEARCH_RESULTS_CAP = 150;
 
+function toggleAgentTable() {
+  const wrapEl = document.getElementById('agentTblWrap');
+  const toggleBtn = document.getElementById('agentTblToggleBtn');
+  const count = document.getElementById('agentTblCount').textContent;
+  const isCollapsed = wrapEl.classList.toggle('collapsed');
+  if (isCollapsed) {
+    toggleBtn.textContent = `عرض الكل (${count} إيچنت)`;
+    wrapEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    toggleBtn.textContent = 'عرض أقل';
+  }
+}
+
 function searchCaseId() {
   const input = document.getElementById('caseIdSearch');
   const query = input.value.trim();
@@ -1504,36 +1506,35 @@ function openAgentPanel(agentName, dsatCases) {
 }
 
 // ═══════════════════════════════════════════
-// EXCEL / CSV EXPORT
+// EXCEL EXPORT (real .xlsx binary, not CSV — avoids separator/encoding issues in Excel)
 // ═══════════════════════════════════════════
 function sanitizeFilename(s) {
   return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
 }
 
-function downloadCsv(filename, rows) {
-  const csv = rows.map(row => row.map(cell => {
-    const s = cell === null || cell === undefined ? '' : String(cell);
-    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
-  }).join(',')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function downloadXlsx(filename, rows, sheetName) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Auto-size columns roughly based on content length
+  const colWidths = rows[0].map((_, colIdx) => {
+    let maxLen = 8;
+    rows.forEach(row => {
+      const cell = row[colIdx];
+      const len = cell === null || cell === undefined ? 0 : String(cell).length;
+      if (len > maxLen) maxLen = len;
+    });
+    return { wch: Math.min(maxLen + 2, 60) };
+  });
+  ws['!cols'] = colWidths;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sheet1');
+  XLSX.writeFile(wb, filename);
 }
 
 function exportPanelCases() {
   if (!currentPanelCases.length) return;
   const rows = [['Case ID', 'Date', 'FAQ', 'Agent', 'Team Leader', 'Account Manager', 'Rate']];
   currentPanelCases.forEach(c => rows.push([c.id, c.date, c.faq, c.agent, c.tl, c.am, c.rate || 1]));
-  downloadCsv(`${sanitizeFilename(currentPanelLabel || 'cases')}.csv`, rows);
+  downloadXlsx(`${sanitizeFilename(currentPanelLabel || 'cases')}.xlsx`, rows, 'Cases');
 }
 
 function exportAgentTable() {
@@ -1546,12 +1547,12 @@ function exportAgentTable() {
     rows.push([
       i+1, a.agent, a.tl, a.am,
       a.counts[1], a.counts[2], a.counts[3], a.counts[4], a.counts[5],
-      a.grandTotal, a.dsatPct.toFixed(1)+'%', a.csatPct.toFixed(1)+'%',
+      a.grandTotal, Number(a.dsatPct.toFixed(1)), Number(a.csatPct.toFixed(1)),
       hitTarget ? 'Achieved' : 'Below', hitTarget ? '' : hitsNeeded
     ]);
   });
   const scopeLabel = currentAgent!=='ALL' ? currentAgent : currentTL!=='ALL' ? currentTL : currentAM!=='ALL' ? currentAM : 'Whole_Floor';
-  downloadCsv(`Agent_Ranking_${sanitizeFilename(scopeLabel)}.csv`, rows);
+  downloadXlsx(`Agent_Ranking_${sanitizeFilename(scopeLabel)}.xlsx`, rows, 'Agent Ranking');
 }
 
 // ═══════════════════════════════════════════

@@ -7,6 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body.theme-light {
@@ -153,7 +154,7 @@
     .rank-b { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:800; }
     .r1 { background:rgba(239,83,80,.22); color:#ef5350; }
     .r2 { background:rgba(255,167,38,.2); color:#ffa726; }
-    .r3 { background:rgba(255,213,79,.2); color:#ffd54f; }
+    .r3 { background:rgba(255,213,79,.2); color:var(--yellow); }
     .rn { background:rgba(100,100,150,.15); color:var(--muted); }
     .aname { font-weight:600; color:var(--subtext); }
     .aclean { font-size:10px; color:var(--muted); }
@@ -234,7 +235,7 @@
     body.theme-dark .coach-btn { color:#ffe066; }
     .coach-btn:hover { background:rgba(251,229,5,.28); }
     .coach-status { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:6px; white-space:nowrap; }
-    .coach-status.pending { background:rgba(255,213,79,.16); color:#b8860b; }
+    .coach-status.pending { background:rgba(255,213,79,.16); color:var(--yellow); }
     .coach-status.overdue { background:rgba(239,83,80,.16); color:#ef5350; }
     .coach-status.improved { background:rgba(39,185,146,.16); color:var(--keeta-green,#1c8f70); }
     .coach-status.no-change { background:rgba(133,151,140,.16); color:var(--muted); }
@@ -262,31 +263,9 @@
       .main { padding:16px; } .header { padding:18px 16px 14px; } .filter-bar,.sync-bar { padding:12px 16px; }
     }
 
-    /* PRINT REPORT */
-    #printReport { display:none; }
-    .pr-header { display:flex; align-items:center; gap:14px; border-bottom:3px solid #FBE505; padding-bottom:14px; margin-bottom:18px; }
-    .pr-header img { width:48px; height:48px; border-radius:11px; }
-    .pr-header h1 { font-size:20px; color:#000; margin:0; }
-    .pr-header .pr-sub { font-size:11px; color:#555; margin-top:2px; }
-    .pr-meta { margin-left:auto; text-align:right; font-size:11px; color:#555; }
-    .pr-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
-    .pr-kpi { border:1px solid #ddd; border-radius:8px; padding:12px 14px; }
-    .pr-kpi .l { font-size:9.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#777; }
-    .pr-kpi .v { font-size:22px; font-weight:800; color:#000; margin-top:4px; }
-    .pr-section-title { font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#333; margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; }
-    .pr-chart-img { width:100%; max-width:100%; border:1px solid #ddd; border-radius:6px; margin-bottom:6px; }
-    .pr-footer { margin-top:24px; font-size:9.5px; color:#999; text-align:center; }
-
-    @media print {
-      body * { visibility:hidden; }
-      #printReport, #printReport * { visibility:visible; }
-      #printReport { display:block; position:absolute; top:0; left:0; width:100%; background:#fff; color:#000; padding:20px; }
-    }
   </style>
 </head>
 <body class="theme-light">
-
-<div id="printReport"></div>
 
 <!-- COACHING MODAL -->
 <div class="coach-modal-overlay" id="coachModalOverlay">
@@ -301,7 +280,7 @@
       <label>تاريخ المتابعة المقترح</label>
       <input type="date" id="coachFollowUpInput" />
     </div>
-    <div class="coach-field">
+    <div class="coach-field" id="coachCategoryField">
       <label>تصنيف المشكلة (اختياري)</label>
       <select id="coachCategoryInput"><option value="">— بدون تصنيف —</option></select>
     </div>
@@ -564,7 +543,15 @@
     </div>
   </div>
 
-  <div class="sec" style="align-items:center;">Agent Ranking Table — CSAT % / DSAT % <button class="upload-btn" style="margin-left:8px; white-space:nowrap;" onclick="exportAgentTable()">⬇ Extract</button></div>
+  <div class="sec" style="align-items:center; flex-wrap:wrap; gap:8px;">Agent Ranking Table — CSAT % / DSAT %
+    <button class="upload-btn" style="margin-left:8px; white-space:nowrap;" onclick="exportAgentTable()">⬇ Extract</button>
+    <span class="filter-lbl" style="margin-left:14px;">Target Status</span>
+    <select class="tl-select" id="agentTargetFilterSelect" style="min-width:170px;" onchange="setAgentTargetFilter(this.value)">
+      <option value="all">الكل</option>
+      <option value="achieved">✓ محقق الهدف بس</option>
+      <option value="below">✗ أقل من الهدف بس</option>
+    </select>
+  </div>
   <div class="card">
     <div class="card-s" style="margin-bottom:12px;">Sorted by DSAT % (highest first). CSAT target: <b style="color:var(--subtext)" id="tableTargetLbl">72%</b>. "Hits to Achieve" = extra consecutive CSAT ratings (4 or 5) needed to reach target, assuming no new DSAT come in. <span class="lowvol">⚠</span> = fewer than 10 rated surveys, percentage may not be reliable.</div>
     <div class="tbl-wrap collapsed" id="agentTblWrap">
@@ -580,7 +567,7 @@
       </table>
     </div>
     <div class="tbl-toggle-row">
-      <button class="tbl-toggle-btn" id="agentTblToggleBtn" onclick="toggleAgentTable()">عرض الكل (<span id="agentTblCount">0</span> إيچنت)</button>
+      <button class="tbl-toggle-btn" id="agentTblToggleBtn" onclick="toggleAgentTable()"><span id="agentTblToggleLabel">عرض الكل</span> (<span id="agentTblCount">0</span> إيچنت)</button>
     </div>
   </div>
 
@@ -595,7 +582,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
       <span class="filter-lbl">🔗 Coaching Sheet Sync (اختياري)</span>
-      <input type="text" id="coachSyncUrlInput" class="sheet-input" style="flex:1; min-width:200px;" placeholder="لينك Google Apps Script Web App للمزامنة بين الأجهزة..." />
+      <input type="text" id="coachSyncUrlInput" class="sheet-input" style="flex:1; min-width:200px;" placeholder="لينك SheetDB API (https://sheetdb.io/api/v1/...)" />
       <button class="upload-btn" onclick="connectCoachingSync()">وصّل</button>
       <button class="reset-btn" onclick="pullCoachingFromRemote(true)">🔄 مزامنة الآن</button>
       <span class="file-lbl" id="coachSyncStatus"><span class="sync-dot off"></span>محفوظ محليًا بس</span>
@@ -942,30 +929,37 @@ function applyFilters() {
   const agentStats = buildAgentStats(scoped).filter(a=>a.grandTotal>0);
   const agentWeekTrend = computeAgentWeekTrend(scoped);
 
-  renderKPIs(scoped, dsatCases, faqStats);
-  renderTrend(dsatCases, scoped);
-  renderPctTrend(scoped);
-  renderPeriodComparisons(scoped);
-  renderFAQCharts(scoped, dsatCases, faqStats);
-  renderFAQList(scoped, dsatCases, faqStats);
-  renderAgentChart(scoped, dsatCases, agentStats);
-  renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend);
-
+  // Set AM/TL section visibility FIRST and unconditionally, before any rendering below.
+  // If a section render throws further down, this state must never get stuck on a stale value.
   const amSection = document.getElementById('amRankSection');
   const tlSection = document.getElementById('tlRankSection');
   if (currentAM === 'ALL') {
     amSection.style.display = 'block';
     tlSection.style.display = 'none';
-    renderAmRank();
   } else if (currentTL === 'ALL') {
     amSection.style.display = 'none';
     tlSection.style.display = 'block';
-    renderTlRank(currentAM);
   } else {
-
     amSection.style.display = 'none';
     tlSection.style.display = 'none';
   }
+
+  // Each section renders independently — one section throwing an error must never block
+  // the others (this is what previously caused sections to get stuck hidden until a full reload).
+  const safeRender = (fn, label) => { try { fn(); } catch(err) { console.warn(`Dashboard render step failed (${label}):`, err); } };
+
+  safeRender(() => renderKPIs(scoped, dsatCases, faqStats), 'KPIs');
+  safeRender(() => renderTrend(dsatCases, scoped), 'Daily Trend');
+  safeRender(() => renderPctTrend(scoped), 'CSAT/DSAT Trend');
+  safeRender(() => renderPeriodComparisons(scoped), 'Period Comparison');
+  safeRender(() => renderFAQCharts(scoped, dsatCases, faqStats), 'FAQ Charts');
+  safeRender(() => renderFAQList(scoped, dsatCases, faqStats), 'FAQ List');
+  safeRender(() => renderAgentChart(scoped, dsatCases, agentStats), 'Agent Chart');
+  safeRender(() => renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend), 'Agent Table');
+  safeRender(() => {
+    if (currentAM === 'ALL') renderAmRank();
+    else if (currentTL === 'ALL') renderTlRank(currentAM);
+  }, 'AM/TL Rank');
 }
 
 function renderKPIs(scoped, dsatCases, faqStats) {
@@ -1332,13 +1326,17 @@ function renderFAQList(scoped, dsatCases, faqStats) {
     const lowVol = d.grandTotal < 10 ? ' <span class="lowvol">⚠</span>' : '';
     const el = document.createElement('div');
     el.className = 'faq-item';
-    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt">${d.dsatCount}</span>`;
+    el.innerHTML = `<span class="faq-num">${i+1}</span><span class="faq-lbl">${d.faq}${lowVol}</span><div class="faq-bar-w"><div class="faq-bar-i" style="width:${pct}%"></div></div><span class="faq-cnt">${d.dsatCount}</span><button class="coach-btn" data-faq-coach style="margin-left:8px;">🎯</button>`;
     el.title = `${d.dsatCount} DSAT cases — DSAT ${d.dsatPct.toFixed(1)}% vs CSAT ${d.csatPct.toFixed(1)}% (${d.grandTotal} rated)`;
     el.addEventListener('click', ()=> {
       document.querySelectorAll('.faq-item').forEach(x=>x.classList.remove('active'));
       el.classList.add('active');
       const faqCases = dsatCases.filter(c=>c.faq===d.faq);
       openPanel({ label: d.faq, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} — DSAT ${d.dsatPct.toFixed(1)}% vs CSAT ${d.csatPct.toFixed(1)}% of ${d.grandTotal} rated cases` });
+    });
+    el.querySelector('[data-faq-coach]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCoachModalForFaq(d.faq);
     });
     listEl.appendChild(el);
   });
@@ -1382,55 +1380,91 @@ function renderAgentChart(scoped, dsatCases, agentStats) {
   });
 }
 
+const AGENT_TABLE_INITIAL_LIMIT = 50;
+let agentTargetFilter = 'all'; // 'all' | 'achieved' | 'below'
+
+function setAgentTargetFilter(val) {
+  agentTargetFilter = val;
+  applyFilters();
+}
+
+function filterByTargetStatus(agentStats) {
+  if (agentTargetFilter === 'achieved') return agentStats.filter(a => a.csatPct >= CSAT_TARGET);
+  if (agentTargetFilter === 'below') return agentStats.filter(a => a.csatPct < CSAT_TARGET);
+  return agentStats;
+}
+let lastAgentTableData = [];
+let lastAgentTableDsatCases = [];
+let lastAgentTableWeekTrend = null;
+let agentTableExpanded = false;
+
+function buildAgentRow(a, rank, dsatCases, agentWeekTrend) {
+  const rc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'rn';
+  const topFaqs = Object.keys(a.faqs).sort((x,y)=>a.faqs[y]-a.faqs[x]).slice(0,2).map(f=>`${f.length>20?f.slice(0,18)+'..':f} (${a.faqs[f]})`);
+  const chips = topFaqs.map(f=>`<span class="chip">${f}</span>`).join('');
+  const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
+  const hitTarget = a.csatPct >= CSAT_TARGET;
+  const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
+  const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, CSAT_TARGET);
+  const hitsCell = hitTarget ? `<span style="color:#66bb6a;font-weight:700;">—</span>` : `<span style="color:var(--yellow);font-weight:700;">+${hitsNeeded} CSAT</span>`;
+  const trendCell = agentTrendBadgeHtml(a.agent, agentWeekTrend);
+  const isCoached = coachingLog.some(e => e.agent === a.agent);
+  const coachBtnHtml = `<button class="coach-btn" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${isCoached ? '📝 متابَع' : '🎯 علّم'}</button>`;
+  const tr = document.createElement('tr');
+  tr.className = 'trow';
+  tr.dataset.agent = a.agent;
+  tr.innerHTML = `
+    <td><span class="rank-b ${rc}">${rank}</span></td>
+    <td><div class="aname">${a.agent}</div><div class="aclean">${String(a.agent).replace('jw_','')}</div></td>
+    <td><span class="tl-chip">${a.tl}</span></td>
+    <td><span class="am-chip">${a.am}</span></td>
+    <td>${a.counts[1]||''}</td><td>${a.counts[2]||''}</td><td>${a.counts[3]||''}</td><td>${a.counts[4]||''}</td><td>${a.counts[5]||''}</td>
+    <td style="font-weight:700">${a.grandTotal}</td>
+    <td><span class="pctval dsat">${a.dsatPct.toFixed(1)}%</span> ${lowVolFlag}</td>
+    <td>${trendCell}</td>
+    <td><span class="pctval csat">${a.csatPct.toFixed(1)}%</span></td>
+    <td>${targetBadge}</td>
+    <td>${hitsCell}</td>
+    <td>${chips}</td>
+    <td>${coachBtnHtml}</td>`;
+  tr.addEventListener('click', ()=> openAgentPanel(a.agent, dsatCases));
+  return tr;
+}
+
+function appendAgentRows(rows, startIndex, dsatCases, agentWeekTrend, tbody) {
+  const frag = document.createDocumentFragment();
+  rows.forEach((a, idx) => {
+    try {
+      frag.appendChild(buildAgentRow(a, startIndex + idx + 1, dsatCases, agentWeekTrend));
+    } catch(rowErr) {
+      console.warn('Skipped one agent table row due to an error:', a && a.agent, rowErr);
+    }
+  });
+  tbody.appendChild(frag);
+}
+
 function renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend) {
-  const agentData = agentStats.slice().sort((a,b)=>b.dsatPct-a.dsatPct);
+  const agentData = filterByTargetStatus(agentStats).slice().sort((a,b)=>b.dsatPct-a.dsatPct);
+  lastAgentTableData = agentData;
+  lastAgentTableDsatCases = dsatCases;
+  lastAgentTableWeekTrend = agentWeekTrend;
+  agentTableExpanded = false;
+
   const tbody = document.getElementById('agentTableBody');
   tbody.innerHTML = '';
 
   document.getElementById('agentTblCount').textContent = agentData.length;
   const wrapEl = document.getElementById('agentTblWrap');
   const toggleBtn = document.getElementById('agentTblToggleBtn');
+  const toggleLabel = document.getElementById('agentTblToggleLabel');
   wrapEl.classList.add('collapsed');
-  toggleBtn.textContent = `عرض الكل (${agentData.length} إيچنت)`;
-  toggleBtn.style.display = agentData.length > 10 ? 'inline-block' : 'none';
+  toggleLabel.textContent = 'عرض الكل';
+  toggleBtn.style.display = agentData.length > AGENT_TABLE_INITIAL_LIMIT ? 'inline-block' : 'none';
 
-  agentData.forEach((a,i)=>{
-   try {
-    const rank = i+1;
-    const rc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'rn';
-    const topFaqs = Object.keys(a.faqs).sort((x,y)=>a.faqs[y]-a.faqs[x]).slice(0,2).map(f=>`${f.length>20?f.slice(0,18)+'..':f} (${a.faqs[f]})`);
-    const chips = topFaqs.map(f=>`<span class="chip">${f}</span>`).join('');
-    const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
-    const hitTarget = a.csatPct >= CSAT_TARGET;
-    const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
-    const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, CSAT_TARGET);
-    const hitsCell = hitTarget ? `<span style="color:#66bb6a;font-weight:700;">—</span>` : `<span style="color:#ffd54f;font-weight:700;">+${hitsNeeded} CSAT</span>`;
-    const trendCell = agentTrendBadgeHtml(a.agent, agentWeekTrend);
-    const isCoached = coachingLog.some(e => e.agent === a.agent);
-    const coachBtnHtml = `<button class="coach-btn" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${isCoached ? '📝 متابَع' : '🎯 علّم'}</button>`;
-    const tr = document.createElement('tr');
-    tr.className = 'trow';
-    tr.dataset.agent = a.agent;
-    tr.innerHTML = `
-      <td><span class="rank-b ${rc}">${rank}</span></td>
-      <td><div class="aname">${a.agent}</div><div class="aclean">${String(a.agent).replace('jw_','')}</div></td>
-      <td><span class="tl-chip">${a.tl}</span></td>
-      <td><span class="am-chip">${a.am}</span></td>
-      <td>${a.counts[1]||''}</td><td>${a.counts[2]||''}</td><td>${a.counts[3]||''}</td><td>${a.counts[4]||''}</td><td>${a.counts[5]||''}</td>
-      <td style="font-weight:700">${a.grandTotal}</td>
-      <td><span class="pctval dsat">${a.dsatPct.toFixed(1)}%</span> ${lowVolFlag}</td>
-      <td>${trendCell}</td>
-      <td><span class="pctval csat">${a.csatPct.toFixed(1)}%</span></td>
-      <td>${targetBadge}</td>
-      <td>${hitsCell}</td>
-      <td>${chips}</td>
-      <td>${coachBtnHtml}</td>`;
-    tr.addEventListener('click', ()=> openAgentPanel(a.agent, dsatCases));
-    tbody.appendChild(tr);
-   } catch(rowErr) {
-    console.warn('Skipped one agent table row due to an error:', a && a.agent, rowErr);
-   }
-  });
+  // Only build the first N rows synchronously — building all rows (300+) at once on every
+  // filter change is what was causing the page to hang/freeze, especially on mobile.
+  const initialRows = agentData.slice(0, AGENT_TABLE_INITIAL_LIMIT);
+  appendAgentRows(initialRows, 0, dsatCases, agentWeekTrend, tbody);
 }
 
 function getDsatColor(pct) {
@@ -1445,10 +1479,11 @@ function getDsatColor(pct) {
 }
 
 function renderAmRank() {
-  const amNames = Object.keys(hierarchy);
-  const amData = amNames.map(am => {
-    const recs = ALL_RECORDS.filter(r=>r.am===am);
-    const stats = computeRateStats(recs);
+  // Single pass over ALL_RECORDS instead of one .filter() per AM (was O(numAMs × n))
+  const grouped = {};
+  ALL_RECORDS.forEach(r => { (grouped[r.am] = grouped[r.am] || []).push(r); });
+  const amData = Object.keys(hierarchy).map(am => {
+    const stats = computeRateStats(grouped[am] || []);
     return { name: am, ...stats };
   }).filter(a=>a.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct);
 
@@ -1479,10 +1514,13 @@ function renderAmRank() {
 }
 
 function renderTlRank(am) {
+  // Single pass over this AM's records instead of one .filter() per TL
+  const amRecords = ALL_RECORDS.filter(r => r.am === am);
+  const grouped = {};
+  amRecords.forEach(r => { (grouped[r.tl] = grouped[r.tl] || []).push(r); });
   const tls = Array.from(hierarchy[am] || []);
   const tlData = tls.map(tl => {
-    const recs = ALL_RECORDS.filter(r=>r.am===am && r.tl===tl);
-    const stats = computeRateStats(recs);
+    const stats = computeRateStats(grouped[tl] || []);
     return { name: tl, ...stats };
   }).filter(t=>t.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct);
 
@@ -1536,7 +1574,12 @@ function openPanel({ label, cases, icon, sub }) {
         <div class="case-id">Case #${c.id}</div>
         <div class="case-faq">${c.faq}</div>
         <div class="case-agent"><div class="agent-dot"></div><span class="agent-lbl">${c.agent}</span><span class="tl-chip">${c.tl}</span><span class="am-chip">${c.am}</span></div>
-        <div class="case-day">${c.date}</div>`;
+        <div class="case-day">${c.date}</div>
+        <div style="margin-top:8px;"><button class="coach-btn" data-case-coach>🎯 كوتش على الكيس ده</button></div>`;
+      card.querySelector('[data-case-coach]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCoachModal(c.agent, { caseId: c.id, faqPreset: c.faq });
+      });
       grid.appendChild(card);
     });
   }
@@ -1547,14 +1590,23 @@ const SEARCH_RESULTS_CAP = 150;
 
 function toggleAgentTable() {
   const wrapEl = document.getElementById('agentTblWrap');
-  const toggleBtn = document.getElementById('agentTblToggleBtn');
-  const count = document.getElementById('agentTblCount').textContent;
-  const isCollapsed = wrapEl.classList.toggle('collapsed');
-  if (isCollapsed) {
-    toggleBtn.textContent = `عرض الكل (${count} إيچنت)`;
-    wrapEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const toggleLabel = document.getElementById('agentTblToggleLabel');
+
+  if (!agentTableExpanded) {
+    // Build the remaining rows lazily — only happens once, only if the person actually asks for it
+    if (lastAgentTableData.length > AGENT_TABLE_INITIAL_LIMIT) {
+      const tbody = document.getElementById('agentTableBody');
+      const remaining = lastAgentTableData.slice(AGENT_TABLE_INITIAL_LIMIT);
+      appendAgentRows(remaining, AGENT_TABLE_INITIAL_LIMIT, lastAgentTableDsatCases, lastAgentTableWeekTrend, tbody);
+    }
+    agentTableExpanded = true;
+    wrapEl.classList.remove('collapsed');
+    toggleLabel.textContent = 'عرض أقل';
   } else {
-    toggleBtn.textContent = 'عرض أقل';
+    agentTableExpanded = false;
+    wrapEl.classList.add('collapsed');
+    wrapEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    toggleLabel.textContent = 'عرض الكل';
   }
 }
 
@@ -1567,6 +1619,11 @@ let coachingLog = [];
 let coachingSyncUrl = '';
 let coachModalAgent = null;
 let coachModalEditId = null;
+let coachModalScopeType = 'agent';
+let coachModalFaqTopic = null;
+let coachModalScopeAM = null;
+let coachModalScopeTL = null;
+let coachModalCaseId = null;
 
 function genId() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -1583,14 +1640,23 @@ function saveCoachingLog() {
   try { localStorage.setItem(COACHING_KEY, JSON.stringify(coachingLog)); } catch(e) {}
 }
 
-function openCoachModal(agentName) {
+function openCoachModal(agentName, opts) {
+  opts = opts || {};
+  coachModalScopeType = 'agent';
   coachModalAgent = agentName;
-  const existing = coachingLog.find(e => e.agent === agentName);
+  coachModalFaqTopic = null;
+  coachModalCaseId = opts.caseId || null;
+  document.getElementById('coachCategoryField').style.display = 'block';
+
+  const existing = coachingLog.find(e => e.scopeType !== 'faq' && e.agent === agentName);
   coachModalEditId = existing ? existing.id : null;
 
   document.getElementById('coachModalTitle').textContent = existing ? `تعديل متابعة: ${agentName}` : `علامة متابعة جديدة: ${agentName}`;
-  document.getElementById('coachModalSub').textContent = existing ? `آخر تحديث: ${new Date(existing.updatedAt).toLocaleDateString('ar-EG')}` : 'هيتقارن أداء الإيچنت قبل وبعد النهارده تلقائيًا';
-  document.getElementById('coachNoteInput').value = existing ? existing.note : '';
+  let subText = existing ? `آخر تحديث: ${new Date(existing.updatedAt).toLocaleDateString('ar-EG')}` : 'هيتقارن أداء الإيچنت قبل وبعد النهارده تلقائيًا';
+  if (opts.caseId && !existing) subText = `بخصوص كيس #${opts.caseId} — ${subText}`;
+  document.getElementById('coachModalSub').textContent = subText;
+
+  document.getElementById('coachNoteInput').value = existing ? existing.note : (opts.caseId ? `بخصوص كيس #${opts.caseId}: ` : '');
   document.getElementById('coachFollowUpInput').value = existing ? existing.followUpDate : '';
   document.getElementById('coachDeleteBtn').style.display = existing ? 'inline-block' : 'none';
 
@@ -1605,7 +1671,7 @@ function openCoachModal(agentName) {
     const opt = document.createElement('option');
     opt.value = faq;
     opt.textContent = `${faq} (${agentFaqCounts[faq]})`;
-    if (existing && existing.category === faq) opt.selected = true;
+    if ((existing && existing.category === faq) || (!existing && opts.faqPreset === faq)) opt.selected = true;
     catSelect.appendChild(opt);
   });
 
@@ -1618,43 +1684,117 @@ function openCoachModal(agentName) {
   document.getElementById('coachModalOverlay').classList.add('open');
 }
 
+function openCoachModalForFaq(faqTopic, presetAM, presetTL) {
+  const scopeAM = presetAM !== undefined ? presetAM : currentAM;
+  const scopeTL = presetTL !== undefined ? presetTL : currentTL;
+  coachModalScopeType = 'faq';
+  coachModalAgent = null;
+  coachModalFaqTopic = faqTopic;
+  coachModalScopeAM = scopeAM;
+  coachModalScopeTL = scopeTL;
+  coachModalCaseId = null;
+  document.getElementById('coachCategoryField').style.display = 'none';
+
+  const existing = coachingLog.find(e => e.scopeType === 'faq' && e.faqTopic === faqTopic && e.scopeAM === scopeAM && e.scopeTL === scopeTL);
+  coachModalEditId = existing ? existing.id : null;
+
+  const scopeLabel = scopeTL !== 'ALL' ? `Team Leader: ${scopeTL}` : (scopeAM !== 'ALL' ? `Account Manager: ${scopeAM}` : 'الفلور بالكامل');
+  document.getElementById('coachModalTitle').textContent = existing ? `تعديل متابعة موضوع: ${faqTopic}` : `متابعة موضوع جديد: ${faqTopic}`;
+  document.getElementById('coachModalSub').textContent = `النطاق: ${scopeLabel} — هيتقارن حجم/نسبة الشكاوى من النوع ده قبل وبعد تاريخ العلامة`;
+  document.getElementById('coachNoteInput').value = existing ? existing.note : '';
+  document.getElementById('coachFollowUpInput').value = existing ? existing.followUpDate : '';
+  document.getElementById('coachDeleteBtn').style.display = existing ? 'inline-block' : 'none';
+
+  if (!document.getElementById('coachFollowUpInput').value) {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    document.getElementById('coachFollowUpInput').value = d.toISOString().slice(0,10);
+  }
+
+  document.getElementById('coachModalOverlay').classList.add('open');
+}
+
+function editCoachEntry(id) {
+  const entry = coachingLog.find(e => e.id === id);
+  if (!entry) return;
+  if (entry.scopeType === 'faq') {
+    openCoachModalForFaq(entry.faqTopic, entry.scopeAM, entry.scopeTL);
+  } else {
+    openCoachModal(entry.agent);
+  }
+}
+
 function closeCoachModal() {
   document.getElementById('coachModalOverlay').classList.remove('open');
   coachModalAgent = null;
   coachModalEditId = null;
+  coachModalFaqTopic = null;
+  coachModalCaseId = null;
 }
 
 function saveCoachEntry() {
-  if (!coachModalAgent) return;
   const note = document.getElementById('coachNoteInput').value.trim();
   const followUpDate = document.getElementById('coachFollowUpInput').value;
-  const category = document.getElementById('coachCategoryInput').value;
   if (!note) { alert('اكتب ملاحظة الكوتش الأول'); return; }
 
-  const rec = ALL_RECORDS.find(r => r.agent === coachModalAgent);
-  const tl = rec ? rec.tl : 'Unassigned';
-  const am = rec ? rec.am : 'Unassigned';
-
   let entry;
-  if (coachModalEditId) {
-    entry = coachingLog.find(e => e.id === coachModalEditId);
-    entry.note = note;
-    entry.followUpDate = followUpDate;
-    entry.category = category;
-    entry.updatedAt = Date.now();
+  const isUpdate = !!coachModalEditId;
+
+  if (coachModalScopeType === 'faq') {
+    if (!coachModalFaqTopic) return;
+    if (coachModalEditId) {
+      entry = coachingLog.find(e => e.id === coachModalEditId);
+      entry.note = note;
+      entry.followUpDate = followUpDate;
+      entry.updatedAt = Date.now();
+    } else {
+      entry = {
+        id: genId(),
+        scopeType: 'faq',
+        agent: null,
+        faqTopic: coachModalFaqTopic,
+        scopeAM: coachModalScopeAM,
+        scopeTL: coachModalScopeTL,
+        tl: coachModalScopeTL !== 'ALL' ? coachModalScopeTL : 'الكل',
+        am: coachModalScopeAM !== 'ALL' ? coachModalScopeAM : 'الكل',
+        note, category: coachModalFaqTopic,
+        caseId: null,
+        flagDate: new Date().toISOString().slice(0,10),
+        followUpDate,
+        updatedAt: Date.now()
+      };
+      coachingLog.push(entry);
+    }
   } else {
-    entry = {
-      id: genId(),
-      agent: coachModalAgent,
-      tl, am, note, category,
-      flagDate: new Date().toISOString().slice(0,10),
-      followUpDate,
-      updatedAt: Date.now()
-    };
-    coachingLog.push(entry);
+    if (!coachModalAgent) return;
+    const category = document.getElementById('coachCategoryInput').value;
+    const rec = ALL_RECORDS.find(r => r.agent === coachModalAgent);
+    const tl = rec ? rec.tl : 'Unassigned';
+    const am = rec ? rec.am : 'Unassigned';
+    if (coachModalEditId) {
+      entry = coachingLog.find(e => e.id === coachModalEditId);
+      entry.note = note;
+      entry.followUpDate = followUpDate;
+      entry.category = category;
+      entry.updatedAt = Date.now();
+    } else {
+      entry = {
+        id: genId(),
+        scopeType: 'agent',
+        agent: coachModalAgent,
+        faqTopic: null,
+        tl, am, note, category,
+        caseId: coachModalCaseId || null,
+        flagDate: new Date().toISOString().slice(0,10),
+        followUpDate,
+        updatedAt: Date.now()
+      };
+      coachingLog.push(entry);
+    }
   }
+
   saveCoachingLog();
-  pushCoachingToRemote(entry);
+  pushCoachingToRemote(entry, isUpdate);
   renderCoachingTracker();
   closeCoachModal();
 }
@@ -1668,11 +1808,10 @@ function deleteCoachEntry() {
   closeCoachModal();
 }
 
-function computeCoachingImpact(entry) {
-  const agentRecords = ALL_RECORDS.filter(r => r.agent === entry.agent && r.rate);
+function computeCoachingImpact(entry, relevantRecords) {
   const flagDateObj = new Date(entry.flagDate);
-  const before = agentRecords.filter(r => dateLabelToDate(r.date) < flagDateObj);
-  const after = agentRecords.filter(r => dateLabelToDate(r.date) >= flagDateObj);
+  const before = relevantRecords.filter(r => dateLabelToDate(r.date) < flagDateObj);
+  const after = relevantRecords.filter(r => dateLabelToDate(r.date) >= flagDateObj);
   const beforeStats = computeRateStats(before);
   const afterStats = computeRateStats(after);
   const followUpPassed = new Date(entry.followUpDate) < new Date();
@@ -1701,22 +1840,41 @@ function renderCoachingTracker() {
   wrapEl.style.display = 'block';
   emptyEl.style.display = 'none';
 
+  // Group ALL_RECORDS by agent once instead of filtering the whole array per coaching entry
+  const byAgent = {};
+  ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
+
   const sorted = coachingLog.slice().sort((a,b) => b.updatedAt - a.updatedAt);
+  const frag = document.createDocumentFragment();
   sorted.forEach(entry => {
-    const impact = computeCoachingImpact(entry);
+    let impact, targetCell, noteCell;
+    if (entry.scopeType === 'faq') {
+      const relevant = ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
+        (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
+        (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
+      impact = computeCoachingImpact(entry, relevant);
+      const scopeLabel = entry.scopeTL !== 'ALL' ? entry.scopeTL : (entry.scopeAM !== 'ALL' ? entry.scopeAM : 'الفلور كامل');
+      targetCell = `<div class="aname">📋 ${entry.faqTopic}</div><div class="aclean">نطاق: ${scopeLabel}</div>`;
+      noteCell = `<div class="coach-note-cell">${entry.note}</div>`;
+    } else {
+      impact = computeCoachingImpact(entry, byAgent[entry.agent] || []);
+      targetCell = `<div class="aname">${entry.agent}</div><div class="aclean">${String(entry.agent).replace('jw_','')}</div>`;
+      noteCell = `<div class="coach-note-cell">${entry.note}${entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : ''}${entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">كيس #${entry.caseId}</span>` : ''}</div>`;
+    }
     const tr = document.createElement('tr');
     tr.className = 'trow';
     tr.innerHTML = `
-      <td><div class="aname">${entry.agent}</div><div class="aclean">${String(entry.agent).replace('jw_','')}</div></td>
+      <td>${targetCell}</td>
       <td><span class="tl-chip">${entry.tl}</span></td>
       <td><span class="am-chip">${entry.am}</span></td>
-      <td><div class="coach-note-cell">${entry.note}${entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : ''}</div></td>
+      <td>${noteCell}</td>
       <td style="font-size:11.5px;color:var(--muted);">${entry.flagDate}</td>
       <td style="font-size:11.5px;color:var(--muted);">${entry.followUpDate}</td>
       <td><span class="coach-status ${impact.status}">${impact.label}</span></td>
       <td><button class="coach-btn" onclick="openCoachModal('${entry.agent}')">✏️ تعديل</button></td>`;
-    tbody.appendChild(tr);
+    frag.appendChild(tr);
   });
+  tbody.appendChild(frag);
 }
 
 // ═══════════════════════════════════════════
@@ -1761,10 +1919,26 @@ function mergeCoachingEntries(remoteEntries) {
   renderCoachingTracker();
 }
 
-async function pushCoachingToRemote(entry) {
+async function pushCoachingToRemote(entry, isUpdate) {
   if (!coachingSyncUrl) return;
-  try { await fetch(coachingSyncUrl, { method:'POST', body: JSON.stringify(entry) }); }
-  catch(e) { console.warn('Coaching sync push failed', e); }
+  const base = coachingSyncUrl.replace(/\/$/, '');
+  try {
+    if (isUpdate) {
+      // Try to UPDATE the existing row first (SheetDB: PATCH /id/{value})
+      const res = await fetch(`${base}/id/${encodeURIComponent(entry.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: entry })
+      });
+      const result = await res.json().catch(()=>({}));
+      // If nothing matched to update (row not there yet), fall back to creating it
+      if (result && (result.updated === 0 || result.updated === undefined)) {
+        await fetch(base, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: [entry] }) });
+      }
+    } else {
+      await fetch(base, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: [entry] }) });
+    }
+  } catch(e) { console.warn('Coaching sync push failed', e); }
 }
 
 (function initCoaching() {
@@ -1855,7 +2029,7 @@ function exportPanelCases() {
 
 function exportAgentTable() {
   const scoped = getScopedRecords(currentAM, currentTL, currentAgent);
-  const agentData = buildAgentStats(scoped).filter(a=>a.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct);
+  const agentData = filterByTargetStatus(buildAgentStats(scoped).filter(a=>a.grandTotal>0)).sort((a,b)=>b.dsatPct-a.dsatPct);
   const rows = [['#','Agent','Team Leader','Account Manager','Rate 1','Rate 2','Rate 3','Rate 4','Rate 5','Total Rated','DSAT %','CSAT %','Target Status','Hits to Achieve']];
   agentData.forEach((a,i) => {
     const hitTarget = a.csatPct >= CSAT_TARGET;
@@ -1876,11 +2050,11 @@ function exportAgentTable() {
 // ═══════════════════════════════════════════
 function exportFullReportPdf() {
   if (!ALL_RECORDS.length) { alert('لا توجد بيانات لتصديرها بعد — وصّل جوجل شيت أولاً.'); return; }
+  if (!window.jspdf) { alert('مكتبة إنشاء الـ PDF لسه بتحمّل، جرب تاني بعد ثانية.'); return; }
 
   const scoped = getScopedRecords(currentAM, currentTL, currentAgent);
   const dsatCases = scoped.filter(r => r.rate === 1);
   const stats = computeRateStats(scoped);
-
   const scopeLabel = currentAgent!=='ALL' ? `Agent: ${currentAgent}` : currentTL!=='ALL' ? `Team Leader: ${currentTL}` : currentAM!=='ALL' ? `Account Manager: ${currentAM}` : 'Whole Floor';
   const now = new Date();
   const logoSrc = document.querySelector('.header-logo').src;
@@ -1890,54 +2064,127 @@ function exportFullReportPdf() {
     if (inst) { try { chartImgs[id] = inst.toBase64Image(); } catch(e) {} }
   });
 
-  const agentData = buildAgentStats(scoped).filter(a=>a.grandTotal>0).sort((a,b)=>b.dsatPct-a.dsatPct).slice(0,15);
-  const agentRowsHtml = agentData.map((a,i) => `
-    <tr>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;">${i+1}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;">${a.agent}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;">${a.tl}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;">${a.grandTotal}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;color:#c0392b;">${a.dsatPct.toFixed(1)}%</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #eee;color:#1c8f70;">${a.csatPct.toFixed(1)}%</td>
-    </tr>`).join('');
+  const agentData = filterByTargetStatus(buildAgentStats(scoped).filter(a=>a.grandTotal>0)).sort((a,b)=>b.dsatPct-a.dsatPct).slice(0,15);
 
-  const html = `
-    <div class="pr-header">
-      <img src="${logoSrc}" />
-      <div>
-        <h1>Floor DSAT & CSAT Analytics Report</h1>
-        <div class="pr-sub">${scopeLabel}</div>
-      </div>
-      <div class="pr-meta">Generated ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}<br/>Report Period: MTD</div>
-    </div>
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const contentW = pageW - margin * 2;
+  let y = margin;
 
-    <div class="pr-kpis">
-      <div class="pr-kpi"><div class="l">Total DSAT Cases</div><div class="v">${dsatCases.length}</div></div>
-      <div class="pr-kpi"><div class="l">DSAT %</div><div class="v">${stats.dsatPct.toFixed(1)}%</div></div>
-      <div class="pr-kpi"><div class="l">CSAT %</div><div class="v">${stats.csatPct.toFixed(1)}%</div></div>
-      <div class="pr-kpi"><div class="l">Total Rated Surveys</div><div class="v">${stats.grandTotal}</div></div>
-      <div class="pr-kpi"><div class="l">CSAT Target</div><div class="v">${CSAT_TARGET}%</div></div>
-      <div class="pr-kpi"><div class="l">Gap to Target</div><div class="v">${Math.max(0, (CSAT_TARGET-stats.csatPct)).toFixed(1)}pt</div></div>
-    </div>
+  function ensureSpace(neededH) {
+    if (y + neededH > pageH - margin) { doc.addPage(); y = margin; }
+  }
+  function sectionTitle(text) {
+    ensureSpace(10);
+    doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30,30,30);
+    doc.text(text, margin, y);
+    doc.setDrawColor(220,220,220);
+    doc.line(margin, y + 1.5, pageW - margin, y + 1.5);
+    y += 7;
+  }
 
-    ${chartImgs.trendChart ? `<div class="pr-section-title">Daily DSAT Volume</div><img class="pr-chart-img" src="${chartImgs.trendChart}" />` : ''}
-    ${chartImgs.pctTrendChart ? `<div class="pr-section-title">CSAT % vs DSAT % Trend</div><img class="pr-chart-img" src="${chartImgs.pctTrendChart}" />` : ''}
-    ${chartImgs.faqBarChart ? `<div class="pr-section-title">Highest-Risk FAQ Topics</div><img class="pr-chart-img" src="${chartImgs.faqBarChart}" />` : ''}
-    ${chartImgs.agentBarChart ? `<div class="pr-section-title">DSAT % by Agent</div><img class="pr-chart-img" src="${chartImgs.agentBarChart}" />` : ''}
+  // Header
+  try { doc.addImage(logoSrc, 'PNG', margin, y, 16, 16); } catch(e) {}
+  doc.setFontSize(15); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+  doc.text('Floor DSAT & CSAT Analytics Report', margin + 20, y + 6);
+  doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(90,90,90);
+  doc.text(scopeLabel, margin + 20, y + 12);
+  doc.setFontSize(8.5);
+  doc.text(`Generated ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`, pageW - margin, y + 6, { align: 'right' });
+  doc.text('Report Period: MTD', pageW - margin, y + 12, { align: 'right' });
+  y += 22;
+  doc.setDrawColor(251,229,5); doc.setLineWidth(1);
+  doc.line(margin, y, pageW - margin, y);
+  doc.setLineWidth(0.2);
+  y += 8;
 
-    <div class="pr-section-title">Top 15 Agents by DSAT %</div>
-    <table style="width:100%; border-collapse:collapse; font-size:11px;">
-      <thead><tr style="text-align:left; color:#777; font-size:9.5px; text-transform:uppercase;">
-        <th style="padding:5px 8px;">#</th><th style="padding:5px 8px;">Agent</th><th style="padding:5px 8px;">Team Leader</th><th style="padding:5px 8px;">Rated</th><th style="padding:5px 8px;">DSAT %</th><th style="padding:5px 8px;">CSAT %</th>
-      </tr></thead>
-      <tbody>${agentRowsHtml}</tbody>
-    </table>
+  // KPI grid
+  const kpis = [
+    ['TOTAL DSAT CASES', String(dsatCases.length)],
+    ['DSAT %', stats.dsatPct.toFixed(1) + '%'],
+    ['CSAT %', stats.csatPct.toFixed(1) + '%'],
+    ['TOTAL RATED SURVEYS', String(stats.grandTotal)],
+    ['CSAT TARGET', CSAT_TARGET + '%'],
+    ['GAP TO TARGET', Math.max(0, CSAT_TARGET - stats.csatPct).toFixed(1) + 'pt']
+  ];
+  const kpiColW = contentW / 3, kpiRowH = 18;
+  ensureSpace(kpiRowH * 2 + 6);
+  kpis.forEach((k, idx) => {
+    const col = idx % 3, row = Math.floor(idx / 3);
+    const x = margin + col * kpiColW, ky = y + row * kpiRowH;
+    doc.setDrawColor(225,225,225);
+    doc.rect(x, ky, kpiColW - 3, kpiRowH - 3);
+    doc.setFontSize(7.5); doc.setTextColor(120,120,120);
+    doc.text(k[0], x + 3, ky + 6);
+    doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+    doc.text(k[1], x + 3, ky + 13);
+    doc.setFont(undefined, 'normal');
+  });
+  y += kpiRowH * 2 + 6;
 
-    <div class="pr-footer">Floor DSAT &amp; CSAT Analytics Dashboard — auto-generated report</div>
-  `;
+  function addChartImage(title, base64Img) {
+    if (!base64Img) return;
+    sectionTitle(title);
+    const maxH = 55;
+    ensureSpace(maxH + 4);
+    try {
+      const props = doc.getImageProperties(base64Img);
+      const ratio = props.height / props.width;
+      let drawW = contentW, drawH = drawW * ratio;
+      if (drawH > maxH) { drawH = maxH; drawW = drawH / ratio; }
+      doc.addImage(base64Img, 'PNG', margin, y, drawW, drawH);
+      y += drawH + 6;
+    } catch(e) {}
+  }
+  addChartImage('Daily DSAT Volume', chartImgs.trendChart);
+  addChartImage('CSAT % vs DSAT % Trend', chartImgs.pctTrendChart);
+  addChartImage('Highest-Risk FAQ Topics', chartImgs.faqBarChart);
+  addChartImage('DSAT % by Agent', chartImgs.agentBarChart);
 
-  document.getElementById('printReport').innerHTML = html;
-  setTimeout(() => window.print(), 150);
+  // Agent table
+  sectionTitle(`Top ${agentData.length} Agents by DSAT %`);
+  const cols = [
+    { label: '#', w: 8 }, { label: 'Agent', w: 45 }, { label: 'Team Leader', w: 45 },
+    { label: 'Rated', w: 18 }, { label: 'DSAT %', w: 20 }, { label: 'CSAT %', w: 20 }
+  ];
+  ensureSpace(8);
+  let hx = margin;
+  doc.setFontSize(7.5); doc.setTextColor(120,120,120);
+  cols.forEach(c => { doc.text(c.label, hx, y); hx += c.w; });
+  y += 4;
+  doc.setDrawColor(220,220,220);
+  doc.line(margin, y, margin + cols.reduce((s,c)=>s+c.w,0), y);
+  y += 4;
+
+  doc.setFontSize(8);
+  agentData.forEach((a, i) => {
+    ensureSpace(6);
+    let rx = margin;
+    doc.setTextColor(0,0,0);
+    doc.text(String(i+1), rx, y); rx += cols[0].w;
+    doc.text(String(a.agent).slice(0,26), rx, y); rx += cols[1].w;
+    doc.text(String(a.tl).slice(0,26), rx, y); rx += cols[2].w;
+    doc.text(String(a.grandTotal), rx, y); rx += cols[3].w;
+    doc.setTextColor(192,57,43);
+    doc.text(a.dsatPct.toFixed(1) + '%', rx, y); rx += cols[4].w;
+    doc.setTextColor(28,143,112);
+    doc.text(a.csatPct.toFixed(1) + '%', rx, y);
+    y += 5.5;
+  });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7.5); doc.setTextColor(160,160,160);
+    doc.text('Floor DSAT & CSAT Analytics Dashboard — auto-generated report', pageW / 2, pageH - 8, { align: 'center' });
+    doc.text(`${p} / ${pageCount}`, pageW - margin, pageH - 8, { align: 'right' });
+  }
+
+  const filenameScope = scopeLabel.replace(/[:\s]+/g, '_');
+  doc.save(`DSAT_Report_${filenameScope}_${now.toISOString().slice(0,10)}.pdf`);
 }
 
 function closePanel() {

@@ -46,6 +46,11 @@
     .header h1 { font-size:24px; font-weight:800; color:var(--text); }
     .header-sub { font-size:12px; color:var(--muted); margin-top:3px; }
     .header-meta { margin-left:auto; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+    .view-mode-row { display:flex; align-items:center; gap:5px; }
+    .vm-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:10.5px; font-weight:700; padding:4px 11px; border-radius:6px; cursor:pointer; transition:background .15s; }
+    .vm-btn:hover { background:var(--border); }
+    .vm-btn.active { background:var(--keeta-green); color:#fff; border-color:var(--keeta-green); }
+    .vm-day-select { min-width:100px; font-size:11px; padding:4px 8px; }
     .header-meta .date { font-size:11px; color:var(--muted); }
     .total-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(239,83,80,.15); border:1px solid rgba(239,83,80,.3); color:#ef5350; font-size:13px; font-weight:600; padding:5px 14px; border-radius:6px; margin-top:5px; }
     .total-badge span { font-size:18px; font-weight:800; }
@@ -325,6 +330,11 @@
       <span class="theme-toggle-lbl">🌙</span>
     </div>
     <div class="date" id="hdrPeriod">Report Period: MTD</div>
+    <div class="view-mode-row">
+      <button class="vm-btn active" id="vmMtdBtn" onclick="setViewMode('mtd')">MTD</button>
+      <button class="vm-btn" id="vmDailyBtn" onclick="setViewMode('daily')">Daily (DPR)</button>
+      <select class="tl-select vm-day-select" id="dprDaySelect" style="display:none;" onchange="onDprDayChange(this.value)"></select>
+    </div>
     <div class="total-badge"><span id="hdrTotal">0</span> DSAT Cases</div>
   </div>
 </div>
@@ -339,6 +349,7 @@
   <select class="tl-select" id="agentSelect" onchange="onAgentChange(this.value)" disabled></select>
   <button class="reset-btn" onclick="resetToFloor()">🌐 Show Whole Floor</button>
   <button class="upload-btn" onclick="exportFullReportPdf()">📄 Export Full Report (PDF)</button>
+  <button class="upload-btn" id="dprExtractBtn" style="display:none;" onclick="exportDprDayExtract()">⬇ Extract Day (DPR)</button>
   <span style="flex:1"></span>
   <span class="filter-lbl">🔍 Search</span>
   <input type="text" id="caseIdSearch" class="tl-select" placeholder="Case ID / اسم إيچنت / كلمة من الـ FAQ..." style="min-width:220px;" onkeydown="if(event.key==='Enter'){searchCaseId();}" />
@@ -434,6 +445,7 @@
   </div>
 
   <!-- TREND CHART -->
+  <div id="trendSectionWrap">
   <div class="sec">Daily DSAT Trend</div>
   <div class="card trend-card">
     <div class="card-t" id="trendTitle">Daily DSAT Volume — Performance Over Time</div>
@@ -442,8 +454,10 @@
       <canvas id="trendChart"></canvas>
     </div>
   </div>
+  </div>
 
   <!-- CSAT vs DSAT % TREND (IMPROVEMENT TRACKING) -->
+  <div id="pctTrendSectionWrap">
   <div class="sec">CSAT % vs DSAT % Trend — Improvement Tracking</div>
   <div class="card trend-card">
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
@@ -460,13 +474,16 @@
       <canvas id="pctTrendChart"></canvas>
     </div>
   </div>
+  </div>
 
   <!-- PERIOD COMPARISON -->
+  <div id="periodComparisonWrap">
   <div class="sec">Period Comparison</div>
   <div class="card" style="margin-bottom:22px;">
     <div class="card-t">This Week vs Last Week</div>
     <div class="card-s" id="weekCompareSub">—</div>
     <div id="weekCompareBody"></div>
+  </div>
   </div>
 
   <!-- FAQ CHARTS -->
@@ -547,9 +564,9 @@
     <button class="upload-btn" style="margin-left:8px; white-space:nowrap;" onclick="exportAgentTable()">⬇ Extract</button>
     <span class="filter-lbl" style="margin-left:14px;">Target Status</span>
     <select class="tl-select" id="agentTargetFilterSelect" style="min-width:170px;" onchange="setAgentTargetFilter(this.value)">
-      <option value="all">All</option>
-      <option value="achieved">✓ Achieved </option>
-      <option value="below">✗ Not achieved </option>
+      <option value="all">الكل</option>
+      <option value="achieved">✓ محقق الهدف بس</option>
+      <option value="below">✗ أقل من الهدف بس</option>
     </select>
   </div>
   <div class="card">
@@ -567,7 +584,7 @@
       </table>
     </div>
     <div class="tbl-toggle-row">
-      <button class="tbl-toggle-btn" id="agentTblToggleBtn" onclick="toggleAgentTable()"><span id="agentTblToggleLabel">View All </span> (<span id="agentTblCount">0</span> إيچنت)</button>
+      <button class="tbl-toggle-btn" id="agentTblToggleBtn" onclick="toggleAgentTable()"><span id="agentTblToggleLabel">عرض الكل</span> (<span id="agentTblCount">0</span> إيچنت)</button>
     </div>
   </div>
 
@@ -623,6 +640,8 @@ function computeHitsToAchieve(csatCount, grandTotal, targetPct) {
   return Math.max(0, Math.ceil(needed));
 }
 let currentAM = 'ALL';
+let viewMode = 'mtd'; // 'mtd' | 'daily'
+let selectedDprDay = null;
 let currentTL = 'ALL';
 let currentAgent = 'ALL';
 let trendChart, faqBarChartInst, faqDonutInst, agentBarChartInst, tlBarChartInst, amBarChartInst, pctTrendChartInst;
@@ -762,7 +781,11 @@ function groupCount(arr, key) {
 function destroyChart(inst) { if (inst) inst.destroy(); }
 
 function getScopedRecords(am, tl, agent) {
-  return ALL_RECORDS.filter(r => (am === 'ALL' || r.am === am) && (tl === 'ALL' || r.tl === tl) && (agent === 'ALL' || r.agent === agent));
+  let records = ALL_RECORDS.filter(r => (am === 'ALL' || r.am === am) && (tl === 'ALL' || r.tl === tl) && (agent === 'ALL' || r.agent === agent));
+  if (viewMode === 'daily' && selectedDprDay) {
+    records = records.filter(r => r.date === selectedDprDay);
+  }
+  return records;
 }
 
 function computeRateStats(records) {
@@ -898,6 +921,68 @@ function resetToFloor() {
   rebuildTlSelect();
   applyFilters();
 }
+
+// ═══════════════════════════════════════════
+// VIEW MODE — MTD (whole month) vs Daily (DPR: single-day drilldown)
+// ═══════════════════════════════════════════
+function populateDprDaySelect() {
+  const sel = document.getElementById('dprDaySelect');
+  const days = getFullDayRange();
+  sel.innerHTML = '';
+  days.slice().reverse().forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    sel.appendChild(opt);
+  });
+  if (!selectedDprDay || !days.includes(selectedDprDay)) {
+    selectedDprDay = days[days.length - 1] || null;
+  }
+  if (selectedDprDay) sel.value = selectedDprDay;
+}
+
+function updatePeriodLabel() {
+  const el = document.getElementById('hdrPeriod');
+  el.textContent = (viewMode === 'daily' && selectedDprDay) ? `Report Period: DPR — ${selectedDprDay}` : 'Report Period: MTD';
+}
+
+function toggleMultiDaySections() {
+  const hide = viewMode === 'daily';
+  ['trendSectionWrap', 'pctTrendSectionWrap', 'periodComparisonWrap'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hide ? 'none' : '';
+  });
+  document.getElementById('dprExtractBtn').style.display = hide ? 'inline-block' : 'none';
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  document.getElementById('vmMtdBtn').classList.toggle('active', mode === 'mtd');
+  document.getElementById('vmDailyBtn').classList.toggle('active', mode === 'daily');
+  document.getElementById('dprDaySelect').style.display = mode === 'daily' ? 'inline-block' : 'none';
+  if (mode === 'daily' && !selectedDprDay) populateDprDaySelect();
+  updatePeriodLabel();
+  toggleMultiDaySections();
+  if (ALL_RECORDS.length) applyFilters();
+}
+
+function onDprDayChange(day) {
+  selectedDprDay = day;
+  updatePeriodLabel();
+  applyFilters();
+}
+
+function exportDprDayExtract() {
+  if (viewMode !== 'daily' || !selectedDprDay) return;
+  const scoped = getScopedRecords(currentAM, currentTL, currentAgent); // already day-filtered since viewMode==='daily'
+  const dayCases = scoped.filter(r => r.rate);
+  if (!dayCases.length) { alert('لا توجد كيسات مقيّمة في اليوم ده ضمن النطاق الحالي.'); return; }
+  const rows = [['Case ID', 'Date', 'FAQ', 'Agent', 'Team Leader', 'Account Manager', 'Rate']];
+  dayCases.sort((a,b) => a.rate - b.rate).forEach(c => rows.push([c.id, c.date, c.faq, c.agent, c.tl, c.am, c.rate]));
+  const scopeLabel = currentAgent !== 'ALL' ? currentAgent : currentTL !== 'ALL' ? currentTL : currentAM !== 'ALL' ? currentAM : 'Whole_Floor';
+  downloadXlsx(`DPR_${sanitizeFilename(selectedDprDay.replace('/', '-'))}_${sanitizeFilename(scopeLabel)}.xlsx`, rows, 'DPR');
+}
+
 function drillToAm(am) {
   currentAM = am;
   currentTL = 'ALL';
@@ -949,9 +1034,11 @@ function applyFilters() {
   const safeRender = (fn, label) => { try { fn(); } catch(err) { console.warn(`Dashboard render step failed (${label}):`, err); } };
 
   safeRender(() => renderKPIs(scoped, dsatCases, faqStats), 'KPIs');
-  safeRender(() => renderTrend(dsatCases, scoped), 'Daily Trend');
-  safeRender(() => renderPctTrend(scoped), 'CSAT/DSAT Trend');
-  safeRender(() => renderPeriodComparisons(scoped), 'Period Comparison');
+  if (viewMode !== 'daily') {
+    safeRender(() => renderTrend(dsatCases, scoped), 'Daily Trend');
+    safeRender(() => renderPctTrend(scoped), 'CSAT/DSAT Trend');
+    safeRender(() => renderPeriodComparisons(scoped), 'Period Comparison');
+  }
   safeRender(() => renderFAQCharts(scoped, dsatCases, faqStats), 'FAQ Charts');
   safeRender(() => renderFAQList(scoped, dsatCases, faqStats), 'FAQ List');
   safeRender(() => renderAgentChart(scoped, dsatCases, agentStats), 'Agent Chart');
@@ -1809,12 +1896,12 @@ function deleteCoachEntry() {
 }
 
 function computeCoachingImpact(entry, relevantRecords) {
-  const flagDateObj = new Date(entry.flagDate);
+  const flagDateObj = new Date(entry.flagDate + 'T00:00:00');
   const before = relevantRecords.filter(r => dateLabelToDate(r.date) < flagDateObj);
   const after = relevantRecords.filter(r => dateLabelToDate(r.date) >= flagDateObj);
   const beforeStats = computeRateStats(before);
   const afterStats = computeRateStats(after);
-  const followUpPassed = new Date(entry.followUpDate) < new Date();
+  const followUpPassed = new Date(entry.followUpDate + 'T00:00:00') < new Date();
 
   if (after.length < 3) {
     return followUpPassed
@@ -2213,6 +2300,7 @@ function applyNewRecords(records, sourceLabel) {
   currentAgent = 'ALL';
   rebuildAmSelect();
   rebuildTlSelect();
+  populateDprDaySelect();
 
   // Reveal the container BEFORE rendering (not after) — sticky-positioned table headers and
   // charts compute their layout incorrectly if built while the parent is display:none.

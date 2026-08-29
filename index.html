@@ -238,6 +238,8 @@
     /* COACHING TRACKER */
     .coach-btn { background:rgba(251,229,5,.16); border:1px solid rgba(251,229,5,.4); color:#8a6d00; font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:6px; cursor:pointer; white-space:nowrap; }
     body.theme-dark .coach-btn { color:#ffe066; }
+    .coach-btn-suggest { background:rgba(239,83,80,.16); border:1px solid rgba(239,83,80,.5); color:#ef5350; animation:coachPulse 1.8s ease-in-out infinite; }
+    @keyframes coachPulse { 0%,100% { box-shadow:0 0 0 0 rgba(239,83,80,.35); } 50% { box-shadow:0 0 0 4px rgba(239,83,80,0); } }
     .coach-btn:hover { background:rgba(251,229,5,.28); }
     .coach-status { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:6px; white-space:nowrap; }
     .coach-status.pending { background:rgba(255,213,79,.16); color:var(--yellow); }
@@ -629,6 +631,20 @@
 // ═══════════════════════════════════════════
 let ALL_RECORDS = [];      // every row (any rate 1-5 or unrated), deduped by case_id
 const CSAT_TARGET = 72;    // target CSAT% threshold
+const COACHING_SUGGEST_THRESHOLD = 30; // DSAT% at/above which an un-flagged agent is suggested for coaching
+
+function getAgentsWithActiveCoaching() {
+  const byAgent = {};
+  ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
+  const activeSet = new Set();
+  coachingLog.forEach(entry => {
+    if (entry.scopeType === 'faq') return; // suggestion badge only applies to agent-level coaching
+    const impact = computeCoachingImpact(entry, byAgent[entry.agent] || []);
+    if (impact.status === 'pending' || impact.status === 'overdue') activeSet.add(entry.agent);
+  });
+  return activeSet;
+}
+
 
 function computeHitsToAchieve(csatCount, grandTotal, targetPct) {
   // How many more consecutive CSAT (rate 4/5) responses are needed (each also adding to total)
@@ -786,6 +802,13 @@ function getScopedRecords(am, tl, agent) {
     records = records.filter(r => r.date === selectedDprDay);
   }
   return records;
+}
+
+function getDayScopedRecords() {
+  if (viewMode === 'daily' && selectedDprDay) {
+    return ALL_RECORDS.filter(r => r.date === selectedDprDay);
+  }
+  return ALL_RECORDS;
 }
 
 function computeRateStats(records) {
@@ -1483,9 +1506,10 @@ function filterByTargetStatus(agentStats) {
 let lastAgentTableData = [];
 let lastAgentTableDsatCases = [];
 let lastAgentTableWeekTrend = null;
+let lastActiveCoachingSet = new Set();
 let agentTableExpanded = false;
 
-function buildAgentRow(a, rank, dsatCases, agentWeekTrend) {
+function buildAgentRow(a, rank, dsatCases, agentWeekTrend, activeCoachingSet) {
   const rc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'rn';
   const topFaqs = Object.keys(a.faqs).sort((x,y)=>a.faqs[y]-a.faqs[x]).slice(0,2).map(f=>`${f.length>20?f.slice(0,18)+'..':f} (${a.faqs[f]})`);
   const chips = topFaqs.map(f=>`<span class="chip">${f}</span>`).join('');
@@ -1495,8 +1519,11 @@ function buildAgentRow(a, rank, dsatCases, agentWeekTrend) {
   const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, CSAT_TARGET);
   const hitsCell = hitTarget ? `<span style="color:#66bb6a;font-weight:700;">—</span>` : `<span style="color:var(--yellow);font-weight:700;">+${hitsNeeded} CSAT</span>`;
   const trendCell = agentTrendBadgeHtml(a.agent, agentWeekTrend);
-  const isCoached = coachingLog.some(e => e.agent === a.agent);
-  const coachBtnHtml = `<button class="coach-btn" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${isCoached ? '📝 Coached' : '🎯 Coach'}</button>`;
+  const hasActiveFlag = activeCoachingSet && activeCoachingSet.has(a.agent);
+  const needsSuggestion = !hasActiveFlag && a.dsatPct >= COACHING_SUGGEST_THRESHOLD;
+  const coachBtnClass = hasActiveFlag ? 'coach-btn' : (needsSuggestion ? 'coach-btn coach-btn-suggest' : 'coach-btn');
+  const coachBtnLabel = hasActiveFlag ? '📝 Coached' : (needsSuggestion ? '🚨 Needs Follow-up' : '🎯 Coach');
+  const coachBtnHtml = `<button class="${coachBtnClass}" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${coachBtnLabel}</button>`;
   const tr = document.createElement('tr');
   tr.className = 'trow';
   tr.dataset.agent = a.agent;
@@ -1518,11 +1545,11 @@ function buildAgentRow(a, rank, dsatCases, agentWeekTrend) {
   return tr;
 }
 
-function appendAgentRows(rows, startIndex, dsatCases, agentWeekTrend, tbody) {
+function appendAgentRows(rows, startIndex, dsatCases, agentWeekTrend, tbody, activeCoachingSet) {
   const frag = document.createDocumentFragment();
   rows.forEach((a, idx) => {
     try {
-      frag.appendChild(buildAgentRow(a, startIndex + idx + 1, dsatCases, agentWeekTrend));
+      frag.appendChild(buildAgentRow(a, startIndex + idx + 1, dsatCases, agentWeekTrend, activeCoachingSet));
     } catch(rowErr) {
       console.warn('Skipped one agent table row due to an error:', a && a.agent, rowErr);
     }
@@ -1535,6 +1562,7 @@ function renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend) {
   lastAgentTableData = agentData;
   lastAgentTableDsatCases = dsatCases;
   lastAgentTableWeekTrend = agentWeekTrend;
+  lastActiveCoachingSet = getAgentsWithActiveCoaching();
   agentTableExpanded = false;
 
   const tbody = document.getElementById('agentTableBody');
@@ -1551,7 +1579,7 @@ function renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend) {
   // Only build the first N rows synchronously — building all rows (300+) at once on every
   // filter change is what was causing the page to hang/freeze, especially on mobile.
   const initialRows = agentData.slice(0, AGENT_TABLE_INITIAL_LIMIT);
-  appendAgentRows(initialRows, 0, dsatCases, agentWeekTrend, tbody);
+  appendAgentRows(initialRows, 0, dsatCases, agentWeekTrend, tbody, lastActiveCoachingSet);
 }
 
 function getDsatColor(pct) {
@@ -1566,9 +1594,9 @@ function getDsatColor(pct) {
 }
 
 function renderAmRank() {
-  // Single pass over ALL_RECORDS instead of one .filter() per AM (was O(numAMs × n))
+  // Single pass over the day-scoped records instead of one .filter() per AM (was O(numAMs × n))
   const grouped = {};
-  ALL_RECORDS.forEach(r => { (grouped[r.am] = grouped[r.am] || []).push(r); });
+  getDayScopedRecords().forEach(r => { (grouped[r.am] = grouped[r.am] || []).push(r); });
   const amData = Object.keys(hierarchy).map(am => {
     const stats = computeRateStats(grouped[am] || []);
     return { name: am, ...stats };
@@ -1601,8 +1629,8 @@ function renderAmRank() {
 }
 
 function renderTlRank(am) {
-  // Single pass over this AM's records instead of one .filter() per TL
-  const amRecords = ALL_RECORDS.filter(r => r.am === am);
+  // Single pass over this AM's day-scoped records instead of one .filter() per TL
+  const amRecords = getDayScopedRecords().filter(r => r.am === am);
   const grouped = {};
   amRecords.forEach(r => { (grouped[r.tl] = grouped[r.tl] || []).push(r); });
   const tls = Array.from(hierarchy[am] || []);
@@ -1684,7 +1712,7 @@ function toggleAgentTable() {
     if (lastAgentTableData.length > AGENT_TABLE_INITIAL_LIMIT) {
       const tbody = document.getElementById('agentTableBody');
       const remaining = lastAgentTableData.slice(AGENT_TABLE_INITIAL_LIMIT);
-      appendAgentRows(remaining, AGENT_TABLE_INITIAL_LIMIT, lastAgentTableDsatCases, lastAgentTableWeekTrend, tbody);
+      appendAgentRows(remaining, AGENT_TABLE_INITIAL_LIMIT, lastAgentTableDsatCases, lastAgentTableWeekTrend, tbody, lastActiveCoachingSet);
     }
     agentTableExpanded = true;
     wrapEl.classList.remove('collapsed');
@@ -1735,11 +1763,16 @@ function openCoachModal(agentName, opts) {
   coachModalCaseId = opts.caseId || null;
   document.getElementById('coachCategoryField').style.display = 'block';
 
-  const existing = coachingLog.find(e => e.scopeType !== 'faq' && e.agent === agentName);
+  // Only reopen a SPECIFIC prior entry when explicitly editing it (by id) — otherwise this
+  // always starts a fresh entry, so an agent's coaching history is preserved over time.
+  const existing = opts.editId ? coachingLog.find(e => e.id === opts.editId) : null;
   coachModalEditId = existing ? existing.id : null;
+
+  const priorCount = coachingLog.filter(e => e.scopeType !== 'faq' && e.agent === agentName).length;
 
   document.getElementById('coachModalTitle').textContent = existing ? `Edit Follow-up: ${agentName}` : `New Follow-up: ${agentName}`;
   let subText = existing ? `Last updated: ${new Date(existing.updatedAt).toLocaleDateString('en-GB')}` : "Agent's performance before/after today will be compared automatically";
+  if (!existing && priorCount > 0) subText += ` — ${priorCount} previous session${priorCount>1?'s':''} on record`;
   if (opts.caseId && !existing) subText = `Regarding case #${opts.caseId} — ${subText}`;
   document.getElementById('coachModalSub').textContent = subText;
 
@@ -1771,7 +1804,7 @@ function openCoachModal(agentName, opts) {
   document.getElementById('coachModalOverlay').classList.add('open');
 }
 
-function openCoachModalForFaq(faqTopic, presetAM, presetTL) {
+function openCoachModalForFaq(faqTopic, presetAM, presetTL, editId) {
   const scopeAM = presetAM !== undefined ? presetAM : currentAM;
   const scopeTL = presetTL !== undefined ? presetTL : currentTL;
   coachModalScopeType = 'faq';
@@ -1782,12 +1815,18 @@ function openCoachModalForFaq(faqTopic, presetAM, presetTL) {
   coachModalCaseId = null;
   document.getElementById('coachCategoryField').style.display = 'none';
 
-  const existing = coachingLog.find(e => e.scopeType === 'faq' && e.faqTopic === faqTopic && e.scopeAM === scopeAM && e.scopeTL === scopeTL);
+  // Only reopen a SPECIFIC prior entry when explicitly editing it (by id) — otherwise always
+  // start a fresh entry, so a topic's coaching history is preserved over time.
+  const existing = editId ? coachingLog.find(e => e.id === editId) : null;
   coachModalEditId = existing ? existing.id : null;
+
+  const priorCount = coachingLog.filter(e => e.scopeType === 'faq' && e.faqTopic === faqTopic && e.scopeAM === scopeAM && e.scopeTL === scopeTL).length;
 
   const scopeLabel = scopeTL !== 'ALL' ? `Team Leader: ${scopeTL}` : (scopeAM !== 'ALL' ? `Account Manager: ${scopeAM}` : 'Whole Floor');
   document.getElementById('coachModalTitle').textContent = existing ? `Edit Topic Follow-up: ${faqTopic}` : `New Topic Follow-up: ${faqTopic}`;
-  document.getElementById('coachModalSub').textContent = `Scope: ${scopeLabel} — this topic's complaint volume/rate will be compared before and after the flag date`;
+  let subText = `Scope: ${scopeLabel} — this topic's complaint volume/rate will be compared before and after the flag date`;
+  if (!existing && priorCount > 0) subText += ` — ${priorCount} previous session${priorCount>1?'s':''} on record`;
+  document.getElementById('coachModalSub').textContent = subText;
   document.getElementById('coachNoteInput').value = existing ? existing.note : '';
   document.getElementById('coachFollowUpInput').value = existing ? existing.followUpDate : '';
   document.getElementById('coachDeleteBtn').style.display = existing ? 'inline-block' : 'none';
@@ -1805,9 +1844,9 @@ function editCoachEntry(id) {
   const entry = coachingLog.find(e => e.id === id);
   if (!entry) return;
   if (entry.scopeType === 'faq') {
-    openCoachModalForFaq(entry.faqTopic, entry.scopeAM, entry.scopeTL);
+    openCoachModalForFaq(entry.faqTopic, entry.scopeAM, entry.scopeTL, entry.id);
   } else {
-    openCoachModal(entry.agent);
+    openCoachModal(entry.agent, { editId: entry.id });
   }
 }
 
@@ -1883,6 +1922,7 @@ function saveCoachEntry() {
   saveCoachingLog();
   pushCoachingToRemote(entry, isUpdate);
   renderCoachingTracker();
+  if (ALL_RECORDS.length) applyFilters(); // refresh the agent table's Coach/Coached/Needs Follow-up button state immediately
   closeCoachModal();
 }
 
@@ -1892,6 +1932,7 @@ function deleteCoachEntry() {
   coachingLog = coachingLog.filter(e => e.id !== coachModalEditId);
   saveCoachingLog();
   renderCoachingTracker();
+  if (ALL_RECORDS.length) applyFilters();
   closeCoachModal();
 }
 
@@ -1931,20 +1972,40 @@ function renderCoachingTracker() {
   const byAgent = {};
   ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
 
-  const sorted = coachingLog.slice().sort((a,b) => b.updatedAt - a.updatedAt);
-  const frag = document.createDocumentFragment();
-  sorted.forEach(entry => {
-    let impact, targetCell, noteCell;
+  // Compute impact for every entry up front so we can sort by priority: Overdue first,
+  // then Pending (soonest follow-up date first), then resolved (No-change, then Improved).
+  const PRIORITY_RANK = { overdue: 0, pending: 1, 'no-change': 2, improved: 3 };
+  const withImpact = coachingLog.map(entry => {
+    let impact, relevant;
     if (entry.scopeType === 'faq') {
-      const relevant = ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
+      relevant = ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
         (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
         (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
-      impact = computeCoachingImpact(entry, relevant);
+    } else {
+      relevant = byAgent[entry.agent] || [];
+    }
+    impact = computeCoachingImpact(entry, relevant);
+    return { entry, impact };
+  });
+
+  withImpact.sort((a, b) => {
+    const rankDiff = PRIORITY_RANK[a.impact.status] - PRIORITY_RANK[b.impact.status];
+    if (rankDiff !== 0) return rankDiff;
+    if (a.impact.status === 'pending') {
+      // Soonest follow-up date first within the pending group
+      return new Date(a.entry.followUpDate) - new Date(b.entry.followUpDate);
+    }
+    return b.entry.updatedAt - a.entry.updatedAt;
+  });
+
+  const frag = document.createDocumentFragment();
+  withImpact.forEach(({ entry, impact }) => {
+    let targetCell, noteCell;
+    if (entry.scopeType === 'faq') {
       const scopeLabel = entry.scopeTL !== 'ALL' ? entry.scopeTL : (entry.scopeAM !== 'ALL' ? entry.scopeAM : 'Whole Floor');
       targetCell = `<div class="aname">📋 ${entry.faqTopic}</div><div class="aclean">Scope: ${scopeLabel}</div>`;
       noteCell = `<div class="coach-note-cell">${entry.note}</div>`;
     } else {
-      impact = computeCoachingImpact(entry, byAgent[entry.agent] || []);
       targetCell = `<div class="aname">${entry.agent}</div><div class="aclean">${String(entry.agent).replace('jw_','')}</div>`;
       noteCell = `<div class="coach-note-cell">${entry.note}${entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : ''}${entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">Case #${entry.caseId}</span>` : ''}</div>`;
     }
@@ -1958,7 +2019,7 @@ function renderCoachingTracker() {
       <td style="font-size:11.5px;color:var(--muted);">${entry.flagDate}</td>
       <td style="font-size:11.5px;color:var(--muted);">${entry.followUpDate}</td>
       <td><span class="coach-status ${impact.status}">${impact.label}</span></td>
-      <td><button class="coach-btn" onclick="openCoachModal('${entry.agent}')">✏️ Edit</button></td>`;
+      <td><button class="coach-btn" onclick="editCoachEntry('${entry.id}')">✏️ Edit</button></td>`;
     frag.appendChild(tr);
   });
   tbody.appendChild(frag);

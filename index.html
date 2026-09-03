@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; overflow-x:hidden; }
     body.theme-light {
       --bg: #f2f1e6; --surface: #ffffff; --surface2: #eef0e0; --surface3: #e4e8d4;
       --border: #cfd3bd; --border-strong: #b9bea3; --muted: #565a4d; --text: #14160f;
@@ -42,6 +42,9 @@
       --scrollbar: rgba(255,255,255,.14);
       --glass-surface: rgba(23,26,41,.55); --glass-surface-strong: rgba(23,26,41,.74);
       --glass-border: rgba(255,255,255,.09); --glass-blur: 18px;
+      /* Sidebar stays a clean, near-solid white/yellow brand panel even in dark mode — full
+         translucency over a near-black page would muddy it and hurt legibility */
+      --sidebar-bg: rgba(255,255,255,.94); --sidebar-border: #ece2a0;
     }
     :root {
       --radius: 16px; --radius-sm: 10px; --ease: cubic-bezier(.4,0,.2,1); --sidebar-w: 232px; --sidebar-w-collapsed: 76px;
@@ -230,7 +233,7 @@
     /* Donut layout: chart on one side, clean custom legend list on the other (modern, no clutter) */
     .donut-flex { display:flex; gap:20px; align-items:center; height:300px; }
     .donut-visual { position:relative; flex:0 0 230px; height:230px; }
-    .donut-legend { flex:1; min-width:0; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding-right:4px; }
+    .donut-legend { flex:1; min-width:0; width:0; height:100%; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:2px; padding-right:4px; }
     .donut-legend::-webkit-scrollbar { width:5px; }
     .donut-legend::-webkit-scrollbar-thumb { background:var(--scrollbar); border-radius:8px; }
     .donut-legend-item { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:8px; cursor:pointer; transition:background .15s var(--ease); }
@@ -328,6 +331,7 @@
 
     /* 2-COL */
     .grid2 { display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:22px; }
+    .grid2 > .card, .grid3 > .card { min-width:0; }
 
     /* AGENT TABLE */
     .tbl-wrap { overflow-x:auto; }
@@ -415,8 +419,25 @@
 
     /* CASE CARDS */
     .case-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
-    .case-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; transition:transform .15s var(--ease), box-shadow .15s var(--ease); }
-    .case-card:hover { transform:translateY(-2px); box-shadow:var(--card-shadow); }
+    .case-card {
+      position:relative; overflow:hidden; isolation:isolate;
+      background:var(--glass-surface); backdrop-filter:blur(16px) saturate(160%); -webkit-backdrop-filter:blur(16px) saturate(160%);
+      border:1px solid var(--glass-border); border-radius:12px; padding:12px 14px;
+      transition:transform .15s var(--ease), box-shadow .15s var(--ease);
+    }
+    .case-card::before {
+      content:''; position:absolute; width:130px; height:130px; top:-30px; left:-30px; border-radius:50%;
+      background:linear-gradient(120deg,#ec4899,#ef4444 45%,#f59e0b); filter:blur(26px); opacity:.4; z-index:-1;
+      animation:caseCardBlob 10s ease-in-out infinite;
+    }
+    @keyframes caseCardBlob {
+      0%   { transform:translate(0,0); }
+      25%  { transform:translate(70%,10%); }
+      50%  { transform:translate(35%,80%); }
+      75%  { transform:translate(-15%,45%); }
+      100% { transform:translate(0,0); }
+    }
+    .case-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
     .case-id { font-size:10px; color:var(--muted); font-family:monospace; margin-bottom:4px; }
     .case-faq { font-size:11.5px; font-weight:600; color:var(--subtext); margin-bottom:5px; line-height:1.3; }
     .case-agent { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }

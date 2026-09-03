@@ -24,7 +24,8 @@
       --shadow-hover: 0 18px 40px rgba(30,30,15,.16), 0 4px 12px rgba(30,30,15,.09);
       --ring: rgba(21,122,92,.24);
       --scrollbar: rgba(0,0,0,.22);
-      --sidebar-bg: #14160f; --sidebar-text: #eef0e0; --sidebar-muted: #a8ac97; --sidebar-active: #1c8f70;
+      --glass-surface: rgba(255,255,255,.55); --glass-surface-strong: rgba(255,255,255,.72);
+      --glass-border: rgba(255,255,255,.6); --glass-blur: 18px;
     }
     body.theme-dark {
       --bg: #0a0c14; --surface: #171a29; --surface2: #10121e; --surface3: #1c1f34;
@@ -39,57 +40,85 @@
       --shadow-hover: 0 18px 40px rgba(0,0,0,.5);
       --ring: rgba(39,185,146,.28);
       --scrollbar: rgba(255,255,255,.14);
-      --sidebar-bg: #0a0c14; --sidebar-text: #e8eaf0; --sidebar-muted: #7b82a0; --sidebar-active: #27B992;
+      --glass-surface: rgba(23,26,41,.55); --glass-surface-strong: rgba(23,26,41,.74);
+      --glass-border: rgba(255,255,255,.09); --glass-blur: 18px;
     }
-    :root { --radius: 16px; --radius-sm: 10px; --ease: cubic-bezier(.4,0,.2,1); --sidebar-w: 232px; --sidebar-w-collapsed: 76px; }
-    body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; transition:background .25s var(--ease),color .25s var(--ease); -webkit-font-smoothing:antialiased; display:flex; align-items:stretch; }
+    :root {
+      --radius: 16px; --radius-sm: 10px; --ease: cubic-bezier(.4,0,.2,1); --sidebar-w: 232px; --sidebar-w-collapsed: 76px;
+      /* Sidebar is brand-fixed (white + Keeta yellow) — stays consistent across light/dark theme toggle */
+      --sidebar-bg: rgba(255,255,255,.62); --sidebar-bg-soft: #FFFDE7; --sidebar-text: #1a1c16; --sidebar-muted: #6b6f5e;
+      --sidebar-border: #f2e9ad; --sidebar-active-bg: #FBE505; --sidebar-active-text: #14160f;
+      --sidebar-hover-bg: rgba(251,229,5,.28); --sidebar-accent: #FBE505;
+    }
+    body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; transition:background .25s var(--ease),color .25s var(--ease); -webkit-font-smoothing:antialiased; display:flex; align-items:stretch; position:relative; }
+
+    /* Decorative blurred colour blobs behind everything — this is what the glass panels
+       reveal a soft hint of through their frosted, translucent backgrounds */
+    .bg-blobs { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+    .bg-blobs span { position:absolute; border-radius:50%; filter:blur(70px); opacity:.35; }
+    .bg-blobs span:nth-child(1) { width:520px; height:520px; top:-160px; left:-120px; background:var(--keeta-yellow); }
+    .bg-blobs span:nth-child(2) { width:460px; height:460px; bottom:-140px; right:-100px; background:var(--keeta-green); opacity:.22; }
+    .bg-blobs span:nth-child(3) { width:360px; height:360px; top:38%; left:38%; background:var(--blue); opacity:.14; }
+    body.theme-dark .bg-blobs span { opacity:.16; }
+    body.theme-dark .bg-blobs span:nth-child(2) { opacity:.14; }
+    body.theme-dark .bg-blobs span:nth-child(3) { opacity:.1; }
+    .app-shell, .panel-overlay, .coach-modal-overlay { position:relative; z-index:1; }
 
     /* ═══════════ APP SHELL / SIDEBAR ═══════════ */
     .app-shell { display:flex; width:100%; min-height:100vh; }
     .sidebar {
       width:var(--sidebar-w); flex-shrink:0; background:var(--sidebar-bg); color:var(--sidebar-text);
+      backdrop-filter:blur(24px) saturate(180%); -webkit-backdrop-filter:blur(24px) saturate(180%);
       display:flex; flex-direction:column; position:sticky; top:0; height:100vh; z-index:70;
-      transition:width .24s var(--ease); border-right:1px solid rgba(255,255,255,.07);
+      transition:width .24s var(--ease); border-right:1px solid var(--sidebar-border);
+      box-shadow:2px 0 24px rgba(20,20,10,.06);
     }
     .sidebar.collapsed { width:var(--sidebar-w-collapsed); }
+
+    /* Top accent stripe — the "yellow" half of the brand mix */
+    .sidebar::before {
+      content:''; display:block; height:4px; width:100%; flex-shrink:0;
+      background:linear-gradient(90deg, var(--sidebar-accent), #fff6b0 60%, var(--sidebar-accent));
+    }
 
     /* Floating collapse toggle — child of sidebar, anchored to its right edge so it always
        tracks the border regardless of collapsed/expanded width, and is never clipped */
     .sidebar-collapse-btn {
-      position:absolute; top:26px; right:-12px;
-      background:var(--sidebar-bg); border:1px solid rgba(255,255,255,.14); color:var(--sidebar-muted);
-      width:24px; height:24px; border-radius:50%; cursor:pointer; z-index:71;
+      position:absolute; top:30px; right:-13px;
+      background:var(--sidebar-active-bg); border:2px solid #fff; color:var(--sidebar-active-text);
+      width:26px; height:26px; border-radius:50%; cursor:pointer; z-index:71;
       display:flex; align-items:center; justify-content:center; padding:0;
-      transition:background .15s var(--ease), color .15s var(--ease);
+      box-shadow:0 2px 8px rgba(180,150,0,.35);
+      transition:transform .15s var(--ease), box-shadow .15s var(--ease);
     }
     .sidebar-collapse-btn svg { width:13px; height:13px; transition:transform .24s var(--ease); }
     .sidebar.collapsed .sidebar-collapse-btn svg { transform:rotate(180deg); }
-    .sidebar-collapse-btn:hover { background:#1c1f2e; color:#fff; border-color:rgba(255,255,255,.24); }
+    .sidebar-collapse-btn:hover { transform:scale(1.08); box-shadow:0 3px 12px rgba(180,150,0,.45); }
 
-    .sidebar-top { display:flex; align-items:center; gap:10px; padding:18px 18px 16px; border-bottom:1px solid rgba(255,255,255,.08); flex-shrink:0; overflow:hidden; }
-    .sidebar-top img, .sidebar-logo-img { width:32px; height:32px; border-radius:8px; flex-shrink:0; object-fit:cover; }
+    .sidebar-top { display:flex; align-items:center; gap:10px; padding:16px 18px 14px; border-bottom:1px solid var(--sidebar-border); flex-shrink:0; overflow:hidden; }
+    .sidebar.collapsed .sidebar-top { justify-content:center; gap:0; padding-left:0; padding-right:0; }
+    .sidebar-top img, .sidebar-logo-img { height:28px; width:auto; max-width:100%; object-fit:contain; flex-shrink:0; }
+    .sidebar.collapsed .sidebar-top img, .sidebar.collapsed .sidebar-logo-img { height:22px; }
     .sidebar-brand { min-width:0; opacity:1; overflow:hidden; transition:opacity .16s var(--ease); }
     .sidebar.collapsed .sidebar-brand { opacity:0; width:0; }
-    .sidebar-brand .name { font-size:12.5px; font-weight:800; letter-spacing:-.1px; white-space:nowrap; }
+    .sidebar-brand .name { font-size:12.5px; font-weight:800; letter-spacing:-.1px; white-space:nowrap; color:var(--sidebar-text); }
     .sidebar-brand .sub { font-size:10px; color:var(--sidebar-muted); white-space:nowrap; margin-top:1px; }
 
     .sidebar-nav { flex:1; overflow-y:auto; overflow-x:hidden; padding:16px 12px; display:flex; flex-direction:column; gap:2px; }
     .sidebar-nav::-webkit-scrollbar { width:5px; }
-    .sidebar-nav::-webkit-scrollbar-thumb { background:rgba(255,255,255,.14); border-radius:8px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background:rgba(0,0,0,.14); border-radius:8px; }
     .sidebar-link { display:flex; align-items:center; gap:12px; padding:9px 11px; border-radius:9px; color:var(--sidebar-muted); text-decoration:none; font-size:13px; font-weight:600; white-space:nowrap; position:relative; transition:background .15s var(--ease), color .15s var(--ease); }
     .sidebar-link .ic { display:flex; align-items:center; justify-content:center; width:19px; height:19px; flex-shrink:0; }
     .sidebar-link .ic svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
     .sidebar-link .lbl { overflow:hidden; transition:opacity .12s var(--ease); }
     .sidebar.collapsed .sidebar-link .lbl { opacity:0; width:0; }
     .sidebar.collapsed .sidebar-link { justify-content:center; padding:9px; }
-    .sidebar-link:hover { background:rgba(255,255,255,.06); color:#fff; }
-    .sidebar-link.active { background:rgba(39,185,146,.16); color:#fff; }
-    .sidebar-link.active::before { content:''; position:absolute; left:-12px; top:50%; transform:translateY(-50%); width:3px; height:60%; background:var(--sidebar-active); border-radius:0 3px 3px 0; }
-    .sidebar.collapsed .sidebar-link.active::before { display:none; }
-    .sidebar-section-lbl { font-size:9.5px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:rgba(255,255,255,.28); padding:14px 11px 6px; white-space:nowrap; overflow:hidden; }
+    .sidebar-link:hover { background:var(--sidebar-hover-bg); color:var(--sidebar-active-text); }
+    .sidebar-link.active { background:var(--sidebar-active-bg); color:var(--sidebar-active-text); font-weight:700; box-shadow:0 2px 8px rgba(200,170,0,.28); }
+    .sidebar-section-lbl { font-size:9.5px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:#a9ad8f; padding:14px 11px 6px; white-space:nowrap; overflow:hidden; }
     .sidebar.collapsed .sidebar-section-lbl { opacity:0; }
 
-    .sidebar-bottom { padding:14px 16px 18px; border-top:1px solid rgba(255,255,255,.08); flex-shrink:0; }
+    .sidebar-bottom { padding:14px 16px 18px; border-top:1px solid var(--sidebar-border); flex-shrink:0; }
     .sidebar .theme-toggle { justify-content:center; }
     .sidebar.collapsed .theme-toggle-lbl { display:none; }
     .sidebar.collapsed .sidebar-bottom { padding:14px 8px 18px; }
@@ -98,8 +127,8 @@
     .sidebar.collapsed .sidebar-link { position:relative; }
     .sidebar.collapsed .sidebar-link[data-tip]:hover::after {
       content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
-      background:#1c1f2e; color:#fff; font-size:11.5px; font-weight:600; white-space:nowrap;
-      padding:6px 10px; border-radius:7px; box-shadow:0 6px 18px rgba(0,0,0,.3); z-index:80; pointer-events:none;
+      background:#1a1c16; color:#fff; font-size:11.5px; font-weight:600; white-space:nowrap;
+      padding:6px 10px; border-radius:7px; box-shadow:0 6px 18px rgba(0,0,0,.25); z-index:80; pointer-events:none;
     }
 
     .content-area { flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -137,7 +166,7 @@
     body.theme-dark .theme-switch .knob { left:24px; background:var(--blue); }
 
     /* HEADER (slim top bar — brand now lives in sidebar) */
-    .header { background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:relative; z-index:60; }
+    .header { background:var(--glass-surface-strong); backdrop-filter:blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); border-bottom:1px solid var(--glass-border); padding:14px 28px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:relative; z-index:60; }
     .header-logo { height:30px; width:auto; flex-shrink:0; border-radius:6px; }
     .hbadge { background:var(--keeta-green); color:#fff; font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; padding:3px 10px; border-radius:4px; margin-bottom:5px; display:inline-block; }
     .header h1 { font-size:16px; font-weight:800; color:var(--text); letter-spacing:-.2px; }
@@ -157,7 +186,7 @@
     .total-badge span { font-size:18px; font-weight:800; }
 
     /* TOOLBAR (filters + data source, unified) */
-    .toolbar { background:var(--surface2); border-bottom:1px solid var(--border); padding:14px 28px; position:sticky; top:0; z-index:50; backdrop-filter:blur(6px); }
+    .toolbar { background:var(--glass-surface); border-bottom:1px solid var(--glass-border); padding:14px 28px; position:sticky; top:0; z-index:50; backdrop-filter:blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); }
     .toolbar-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .toolbar-row + .toolbar-row { margin-top:10px; }
     .toolbar-group { display:flex; align-items:center; gap:8px; }
@@ -198,14 +227,19 @@
     body.theme-dark .sync-dot.live { background:#66bb6a; }
     .sync-dot.off { background:#8a92a6; }
 
-    /* Data integrity check (AM/TL mapping diagnostic) */
-    .integrity-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px; }
-    .integrity-hint { font-size:11px; color:var(--muted); max-width:520px; }
-    .integrity-results { margin-top:10px; padding:12px 14px; border-radius:10px; font-size:12px; }
-    .integrity-results.clean { background:rgba(63,174,102,.12); border:1px solid rgba(63,174,102,.35); color:#2f8f57; }
-    .integrity-results.issues { background:rgba(239,83,80,.1); border:1px solid rgba(239,83,80,.35); }
-    .integrity-results ul { margin:8px 0 0; padding-left:18px; }
-    .integrity-results li { margin-bottom:4px; }
+    /* Donut layout: chart on one side, clean custom legend list on the other (modern, no clutter) */
+    .donut-flex { display:flex; gap:20px; align-items:center; height:300px; }
+    .donut-visual { position:relative; flex:0 0 230px; height:230px; }
+    .donut-legend { flex:1; min-width:0; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding-right:4px; }
+    .donut-legend::-webkit-scrollbar { width:5px; }
+    .donut-legend::-webkit-scrollbar-thumb { background:var(--scrollbar); border-radius:8px; }
+    .donut-legend-item { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:8px; cursor:pointer; transition:background .15s var(--ease); }
+    .donut-legend-item:hover, .donut-legend-item.is-active { background:var(--surface2); }
+    .donut-legend-dot { width:9px; height:9px; border-radius:3px; flex-shrink:0; }
+    .donut-legend-lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11.5px; color:var(--subtext); font-weight:600; }
+    .donut-legend-val { font-size:11.5px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; margin-left:6px; }
+    .donut-legend-pct { font-size:10px; color:var(--muted); min-width:34px; text-align:right; font-weight:600; }
+    @media(max-width:520px) { .donut-flex { flex-direction:column; height:auto; } .donut-visual { flex:0 0 auto; width:100%; max-width:230px; margin:0 auto; } .donut-legend { max-height:180px; width:100%; } }
 
     /* Donut center content (hover-reactive, like the FAQ share chart) */
     .donut-center { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none; padding:0 14%; }
@@ -260,7 +294,7 @@
 
     /* KPI */
     .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
-    .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; position:relative; overflow:hidden; box-shadow:var(--card-shadow); transition:transform .18s var(--ease), box-shadow .18s var(--ease); animation:fadeSlideUp3d .5s var(--ease) both; }
+    .kpi-card { background:var(--glass-surface); backdrop-filter:blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); border:1px solid var(--glass-border); border-radius:var(--radius); padding:18px 20px; position:relative; overflow:hidden; box-shadow:var(--card-shadow); transition:transform .18s var(--ease), box-shadow .18s var(--ease); animation:fadeSlideUp3d .5s var(--ease) both; }
     .kpi-row .kpi-card:nth-child(1) { animation-delay:.04s; } .kpi-row .kpi-card:nth-child(2) { animation-delay:.09s; } .kpi-row .kpi-card:nth-child(3) { animation-delay:.14s; }
     .kpi-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-hover); }
     .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:var(--radius) var(--radius) 0 0; }
@@ -281,7 +315,7 @@
     .sec::after { content:''; flex:1; height:1px; background:var(--border); }
 
     /* CARD */
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; box-shadow:var(--card-shadow); transition:box-shadow .18s var(--ease); }
+    .card { background:var(--glass-surface); backdrop-filter:blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); border:1px solid var(--glass-border); border-radius:var(--radius); padding:20px 22px; box-shadow:var(--card-shadow); transition:box-shadow .18s var(--ease); }
     .grid2 > .card, .grid3 > .card { animation:fadeSlideUp3d .5s var(--ease) both; }
     .grid2 > .card:nth-child(1) { animation-delay:.03s; } .grid2 > .card:nth-child(2) { animation-delay:.09s; }
     .card:hover { box-shadow:var(--shadow-md); }
@@ -370,7 +404,7 @@
     /* MODAL / SIDE PANEL */
     .panel-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,10,.55); z-index:100; backdrop-filter:blur(4px); animation:fadeSlideUp .01s; }
     .panel-overlay.open { display:flex; align-items:center; justify-content:center; }
-    .panel { background:var(--surface); border:1px solid var(--border); border-radius:18px; width:min(720px,94vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 30px 70px rgba(0,0,0,.3); animation:fadeSlideUp .3s var(--ease); }
+    .panel { background:var(--glass-surface-strong); backdrop-filter:blur(28px) saturate(180%); -webkit-backdrop-filter:blur(28px) saturate(180%); border:1px solid var(--glass-border); border-radius:18px; width:min(720px,94vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 30px 70px rgba(0,0,0,.3); animation:fadeSlideUp .3s var(--ease); }
     .panel-head { padding:18px 22px 14px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px; }
     .panel-icon { font-size:28px; line-height:1; }
     .panel-title { font-size:16px; font-weight:800; color:var(--text); }
@@ -413,7 +447,7 @@
     /* COACH MODAL */
     .coach-modal-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,10,.55); z-index:110; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
     .coach-modal-overlay.open { display:flex; }
-    .coach-modal { background:var(--surface); border:1px solid var(--border); border-radius:18px; width:min(480px,92vw); padding:22px 24px; box-shadow:0 30px 70px rgba(0,0,0,.32); animation:fadeSlideUp .3s var(--ease); }
+    .coach-modal { background:var(--glass-surface-strong); backdrop-filter:blur(28px) saturate(180%); -webkit-backdrop-filter:blur(28px) saturate(180%); border:1px solid var(--glass-border); border-radius:18px; width:min(480px,92vw); padding:22px 24px; box-shadow:0 30px 70px rgba(0,0,0,.32); animation:fadeSlideUp .3s var(--ease); }
     .coach-modal h3 { font-size:15px; color:var(--text); margin-bottom:4px; }
     .coach-modal .sub { font-size:11.5px; color:var(--muted); margin-bottom:16px; }
     .coach-field { margin-bottom:14px; }
@@ -439,6 +473,8 @@
   </style>
 </head>
 <body class="theme-light">
+
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
 
 <!-- COACHING MODAL -->
 <div class="coach-modal-overlay" id="coachModalOverlay">
@@ -599,11 +635,6 @@
     <div id="uploadStatusRow" style="display:none;">
       <div class="upload-status" id="uploadStatus"></div>
     </div>
-    <div class="integrity-row">
-      <button class="reset-btn" onclick="dashCheckDataIntegrity()">🔍 Check TL/AM Assignments</button>
-      <span class="integrity-hint">Flags any Team Leader name that appears under more than one Account Manager in the sheet — the usual cause of the AM/TL filter showing the wrong teams.</span>
-    </div>
-    <div id="integrityCheckResults" class="integrity-results" style="display:none;"></div>
   </div>
 </div>
 
@@ -746,14 +777,17 @@
     </div>
     <div class="card">
       <div class="card-t">Share of DSAT Complaint Volume</div>
-      <div class="card-s">Which topics make up most of the raw complaints — top categories + minor others. Hover a slice for details.</div>
-      <div style="position:relative;height:340px">
-        <canvas id="faqDonut"></canvas>
-        <div class="donut-center" id="faqDonutCenter">
-          <div class="donut-center-lbl" id="faqDonutCenterLbl">Total DSAT</div>
-          <div class="donut-center-val" id="faqDonutCenterVal">0</div>
-          <div class="donut-center-sub" id="faqDonutCenterSub"></div>
+      <div class="card-s">Which topics make up most of the raw complaints — top categories + minor others. Hover or click a slice/row for details.</div>
+      <div class="donut-flex">
+        <div class="donut-visual">
+          <canvas id="faqDonut"></canvas>
+          <div class="donut-center" id="faqDonutCenter">
+            <div class="donut-center-lbl" id="faqDonutCenterLbl">Total DSAT</div>
+            <div class="donut-center-val" id="faqDonutCenterVal">0</div>
+            <div class="donut-center-sub" id="faqDonutCenterSub"></div>
+          </div>
         </div>
+        <div class="donut-legend" id="faqDonutLegend"></div>
       </div>
     </div>
   </div>
@@ -1689,7 +1723,6 @@ function renderFAQCharts(scoped, dsatCases, faqStats) {
   const minorCount = minorItems.reduce((s,d)=>s+d.dsatCount,0);
   const donutColors = ['#ef5350','#e53935','#ff7043','#f57c00','#ffa726','#ffd54f','#c0ca33','#66bb6a','#26a69a','#4db6ac','#42a5f5','#1e88e5','#5c6bc0','#ab47bc','#ec407a','#607d8b'];
   destroyChart(faqDonutInst);
-  const donutLabels = [...top15Vol.map(d=>d.faq.length>26?d.faq.slice(0,24)+'…':d.faq), `Others (${minorItems.length} minor FAQs)`];
   const donutFullLabels = [...top15Vol.map(d=>d.faq), `Others (${minorItems.length} minor FAQs)`];
   const donutValues = [...top15Vol.map(d=>d.dsatCount), minorCount];
   const centerLbl = document.getElementById('faqDonutCenterLbl');
@@ -1701,23 +1734,50 @@ function renderFAQCharts(scoped, dsatCases, faqStats) {
     if (centerSub) centerSub.textContent = sub || '';
   }
   setDonutCenter('Total DSAT', total, `${donutFullLabels.length} topics`);
+
   faqDonutInst = new Chart(document.getElementById('faqDonut'), {
     type:'doughnut',
-    data: { labels:donutLabels, datasets:[{ data:donutValues, backgroundColor:donutColors, borderWidth:2, borderColor:surfaceColor(), hoverOffset:8 }] },
+    data: { labels:donutFullLabels, datasets:[{ data:donutValues, backgroundColor:donutColors, borderWidth:0, borderRadius:6, spacing:3, hoverOffset:6 }] },
     options: {
-      responsive:true, maintainAspectRatio:false, cutout:'62%',
-      plugins:{ legend:{ position:'bottom', labels:{ font:{size:9.5}, padding:7, boxWidth:10 } }, tooltip:{ callbacks:{ label: ctx=>` ${ctx.label}: ${ctx.parsed} cases (${total?((ctx.parsed/total)*100).toFixed(1):0}% of DSAT volume)` } } },
+      responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: ctx=>` ${ctx.label}: ${ctx.parsed} cases (${total?((ctx.parsed/total)*100).toFixed(1):0}% of DSAT volume)` } }
+      },
       onHover(evt, elements) {
-        if (elements && elements.length) {
-          const idx = elements[0].index;
-          const val = donutValues[idx];
-          const pct = total ? ((val/total)*100).toFixed(1) : 0;
-          setDonutCenter(donutFullLabels[idx], val, `${pct}% of DSAT volume`);
-        } else {
-          setDonutCenter('Total DSAT', total, `${donutFullLabels.length} topics`);
-        }
+        highlightDonut(elements && elements.length ? elements[0].index : null);
       }
     }
+  });
+
+  // Custom legend list — replaces Chart.js's cluttered wrapped legend with a clean, scrollable,
+  // clickable list that stays in sync with the chart (hover highlights the slice; click drills in)
+  const legendEl = document.getElementById('faqDonutLegend');
+  legendEl.innerHTML = '';
+  function highlightDonut(idx) {
+    if (!faqDonutInst) return;
+    faqDonutInst.setActiveElements(idx == null ? [] : [{ datasetIndex:0, index:idx }]);
+    faqDonutInst.update();
+    legendEl.querySelectorAll('.donut-legend-item').forEach((el,i) => el.classList.toggle('is-active', i === idx));
+    if (idx == null) { setDonutCenter('Total DSAT', total, `${donutFullLabels.length} topics`); }
+    else { const pct = total ? ((donutValues[idx]/total)*100).toFixed(1) : 0; setDonutCenter(donutFullLabels[idx], donutValues[idx], `${pct}% of DSAT volume`); }
+  }
+  donutFullLabels.forEach((label, idx) => {
+    const pct = total ? ((donutValues[idx]/total)*100).toFixed(1) : 0;
+    const isOthers = label.startsWith('Others (');
+    const row = document.createElement('div');
+    row.className = 'donut-legend-item';
+    row.innerHTML = `<span class="donut-legend-dot" style="background:${donutColors[idx]}"></span><span class="donut-legend-lbl">${label}</span><span class="donut-legend-val">${donutValues[idx]}</span><span class="donut-legend-pct">${pct}%</span>`;
+    row.addEventListener('mouseenter', () => highlightDonut(idx));
+    row.addEventListener('mouseleave', () => highlightDonut(null));
+    if (!isOthers) {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const faqCases = dsatCases.filter(c => c.faq === label);
+        openPanel({ label, cases: faqCases, icon:'📋', sub:`${faqCases.length} DSAT case${faqCases.length!==1?'s':''} with this FAQ` });
+      });
+    }
+    legendEl.appendChild(row);
   });
 }
 
@@ -2848,42 +2908,6 @@ function dashCloseMobileSidebar() {
     if (el) observer.observe(el);
   });
 })();
-
-// ── DATA INTEGRITY CHECK: flag any Team Leader mapped to more than one Account Manager ──
-function dashCheckDataIntegrity() {
-  const box = document.getElementById('integrityCheckResults');
-  if (!box) return;
-  box.style.display = 'block';
-
-  if (!Array.isArray(ALL_RECORDS) || !ALL_RECORDS.length) {
-    box.className = 'integrity-results issues';
-    box.innerHTML = 'No data loaded yet — connect a sheet first.';
-    return;
-  }
-
-  const tlToAms = {};
-  ALL_RECORDS.forEach(r => {
-    if (!tlToAms[r.tl]) tlToAms[r.tl] = new Set();
-    tlToAms[r.tl].add(r.am);
-  });
-
-  const conflicts = Object.keys(tlToAms)
-    .filter(tl => tlToAms[tl].size > 1)
-    .sort((a, b) => tlToAms[b].size - tlToAms[a].size);
-
-  if (!conflicts.length) {
-    box.className = 'integrity-results clean';
-    box.innerHTML = '✅ No conflicts found — every Team Leader in the sheet is linked to exactly one Account Manager.';
-    return;
-  }
-
-  box.className = 'integrity-results issues';
-  const items = conflicts.map(tl => {
-    const ams = Array.from(tlToAms[tl]).join(', ');
-    return `<li><b>${tl}</b> appears under ${tlToAms[tl].size} different Account Managers: ${ams}</li>`;
-  }).join('');
-  box.innerHTML = `⚠️ Found ${conflicts.length} Team Leader name(s) linked to more than one Account Manager in the sheet — this is why the AM filter can show extra teams. Fix the AM/TL columns for these rows in the sheet:<ul>${items}</ul>`;
-}
 </script>
 </body>
 </html>

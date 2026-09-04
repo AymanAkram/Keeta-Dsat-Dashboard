@@ -1109,10 +1109,10 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
-      <span class="filter-lbl">🔗 Coaching Sheet Sync (optional)</span>
-      <input type="text" id="coachSyncUrlInput" class="sheet-input beam-field" style="flex:1; min-width:200px;" placeholder="SheetDB API link (https://sheetdb.io/api/v1/...)" />
+      <span class="filter-lbl">🔗 Coaching &amp; Root Cause Sync (Apps Script)</span>
+      <input type="text" id="coachSyncUrlInput" class="sheet-input beam-field" style="flex:1; min-width:200px;" placeholder="Apps Script Web App link (https://script.google.com/macros/s/.../exec)" />
       <button class="upload-btn" onclick="connectCoachingSync()">Connect</button>
-      <button class="reset-btn" onclick="pullCoachingFromRemote(true)">🔄 Sync Now</button>
+      <button class="reset-btn" onclick="syncNow(true)">🔄 Sync Now</button>
       <span class="file-lbl" id="coachSyncStatus"><span class="sync-dot off"></span>Saved locally only</span>
     </div>
     <div class="tbl-wrap" id="coachTrackerWrap">
@@ -2606,6 +2606,7 @@ function setCaseRootCause(caseId, rootCause) {
   if (!rootCause) { delete rootCauseLog[caseId]; }
   else { rootCauseLog[caseId] = { rootCause, updatedAt: new Date().toISOString() }; }
   saveRootCauseLog();
+  pushRootCauseToRemote(caseId, rootCause);
   try { renderRootCauseBreakdown(getScopedRecords(currentAM, currentTL, currentAgent).filter(r => r.rate === 1)); } catch(e) {}
 }
 function rootCauseSelectHtml(caseId) {
@@ -2829,8 +2830,10 @@ function saveCoachEntry() {
 function deleteCoachEntry() {
   if (!coachModalEditId) return;
   if (!confirm('Are you sure you want to remove this follow-up?')) return;
-  coachingLog = coachingLog.filter(e => e.id !== coachModalEditId);
+  const idToDelete = coachModalEditId;
+  coachingLog = coachingLog.filter(e => e.id !== idToDelete);
   saveCoachingLog();
+  pushCoachingDeleteRemote(idToDelete);
   renderCoachingTracker();
   if (ALL_RECORDS.length) applyFilters();
   closeCoachModal();
@@ -2926,14 +2929,23 @@ function renderCoachingTracker() {
 }
 
 // ═══════════════════════════════════════════
-// COACHING SHEET SYNC (optional, via Google Apps Script Web App)
+// COACHING + ROOT CAUSE SYNC (Google Apps Script Web App, SheetDB-style API)
+// One endpoint, two logical "sheets": ?sheet=coaching and ?sheet=rootcause
 // ═══════════════════════════════════════════
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxT1eoUBymnB08KW1VpBns27PAUVrZ8_dU9nAcMgDy8AbOoQYowcv48lIcZURF8t-aR/exec';
+
 function connectCoachingSync() {
   const url = document.getElementById('coachSyncUrlInput').value.trim();
   if (!url) return;
   coachingSyncUrl = url;
   try { localStorage.setItem(COACHING_SYNC_KEY, url); } catch(e) {}
-  pullCoachingFromRemote(true);
+  syncNow(true);
+}
+
+// Pulls both the coaching log and the root-cause tags from the remote sheet.
+function syncNow(isManual) {
+  pullCoachingFromRemote(isManual);
+  pullRootCauseFromRemote(isManual);
 }
 
 async function pullCoachingFromRemote(isManual) {
@@ -2944,13 +2956,13 @@ async function pullCoachingFromRemote(isManual) {
   }
   const statusEl = document.getElementById('coachSyncStatus');
   try {
-    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'cachebust=' + Date.now());
+    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'sheet=coaching&cachebust=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const remote = await res.json();
-    mergeCoachingEntries(Array.isArray(remote) ? remote : []);
-    statusEl.innerHTML = `<span class="sync-dot live"></span>Synced — last sync ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+    mergeCoachingEntries(Array.isArray(remote) ? remote : (Array.isArray(remote.data) ? remote.data : []));
+    if (statusEl) statusEl.innerHTML = `<span class="sync-dot live"></span>Synced — last sync ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
   } catch(e) {
-    statusEl.innerHTML = `<span class="sync-dot off"></span>Sync failed — running locally only`;
+    if (statusEl) statusEl.innerHTML = `<span class="sync-dot off"></span>Sync failed — running locally only`;
     console.warn('Coaching sync pull failed', e);
   }
 }
@@ -2965,6 +2977,7 @@ function mergeCoachingEntries(remoteEntries) {
   coachingLog = Object.values(byId);
   saveCoachingLog();
   renderCoachingTracker();
+  if (ALL_RECORDS.length) applyFilters();
 }
 
 async function pushCoachingToRemote(entry, isUpdate) {
@@ -2972,21 +2985,70 @@ async function pushCoachingToRemote(entry, isUpdate) {
   const base = coachingSyncUrl.replace(/\/$/, '');
   try {
     if (isUpdate) {
-      // Try to UPDATE the existing row first (SheetDB: PATCH /id/{value})
-      const res = await fetch(`${base}/id/${encodeURIComponent(entry.id)}`, {
+      // Try to UPDATE the existing row first (SheetDB-style: PATCH /id/{value})
+      const res = await fetch(`${base}/id/${encodeURIComponent(entry.id)}?sheet=coaching`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // plain text avoids a CORS preflight against Apps Script
         body: JSON.stringify({ data: entry })
       });
       const result = await res.json().catch(()=>({}));
       // If nothing matched to update (row not there yet), fall back to creating it
       if (result && (result.updated === 0 || result.updated === undefined)) {
-        await fetch(base, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: [entry] }) });
+        await fetch(`${base}?sheet=coaching`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
       }
     } else {
-      await fetch(base, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: [entry] }) });
+      await fetch(`${base}?sheet=coaching`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
     }
   } catch(e) { console.warn('Coaching sync push failed', e); }
+}
+
+async function pushCoachingDeleteRemote(id) {
+  if (!coachingSyncUrl || !id) return;
+  const base = coachingSyncUrl.replace(/\/$/, '');
+  try {
+    await fetch(`${base}/id/${encodeURIComponent(id)}?sheet=coaching`, { method: 'DELETE' });
+  } catch(e) { console.warn('Coaching sync delete failed', e); }
+}
+
+// --- Root cause tags share the same backend, stored as their own "sheet" keyed by case id ---
+async function pullRootCauseFromRemote(isManual) {
+  if (!coachingSyncUrl) return;
+  try {
+    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'sheet=rootcause&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const remote = await res.json();
+    const rows = Array.isArray(remote) ? remote : (Array.isArray(remote.data) ? remote.data : []);
+    rows.forEach(row => {
+      if (!row || !row.id) return;
+      const local = rootCauseLog[row.id];
+      const remoteTime = row.updatedAt ? new Date(row.updatedAt).getTime() : 0;
+      const localTime = local ? new Date(local.updatedAt).getTime() : 0;
+      if (row.rootCause && remoteTime >= localTime) {
+        rootCauseLog[row.id] = { rootCause: row.rootCause, updatedAt: row.updatedAt || new Date().toISOString() };
+      }
+    });
+    saveRootCauseLog();
+    if (ALL_RECORDS.length) applyFilters();
+  } catch(e) {
+    if (isManual) console.warn('Root cause sync pull failed', e);
+  }
+}
+
+async function pushRootCauseToRemote(caseId, rootCause) {
+  if (!coachingSyncUrl || !caseId) return;
+  const base = coachingSyncUrl.replace(/\/$/, '');
+  const entry = { id: caseId, caseId, rootCause: rootCause || '', updatedAt: new Date().toISOString() };
+  try {
+    const res = await fetch(`${base}/id/${encodeURIComponent(caseId)}?sheet=rootcause`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ data: entry })
+    });
+    const result = await res.json().catch(()=>({}));
+    if (result && (result.updated === 0 || result.updated === undefined)) {
+      await fetch(`${base}?sheet=rootcause`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
+    }
+  } catch(e) { console.warn('Root cause sync push failed', e); }
 }
 
 (function initCoaching() {
@@ -2995,13 +3057,13 @@ async function pushCoachingToRemote(entry, isUpdate) {
   loadRootCauseLog();
   try {
     const savedUrl = localStorage.getItem(COACHING_SYNC_KEY);
-    if (savedUrl) {
-      document.getElementById('coachSyncUrlInput').value = savedUrl;
-      coachingSyncUrl = savedUrl;
-    }
+    const initUrl = savedUrl || DEFAULT_SYNC_URL;
+    document.getElementById('coachSyncUrlInput').value = initUrl;
+    coachingSyncUrl = initUrl;
+    if (!savedUrl) localStorage.setItem(COACHING_SYNC_KEY, initUrl);
   } catch(e) {}
   renderCoachingTracker();
-  if (coachingSyncUrl) pullCoachingFromRemote(false);
+  if (coachingSyncUrl) syncNow(false);
 })();
 
 function searchCaseId() {

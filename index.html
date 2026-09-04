@@ -567,7 +567,8 @@
 
     /* ROOT CAUSE */
     .rc-select { width:100%; margin-top:6px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-size:10.5px; padding:5px 7px; border-radius:6px; outline:none; }
-    .rc-breakdown-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border-bottom:1px solid var(--border); }
+    .rc-breakdown-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s var(--ease), transform .12s var(--ease); }
+    .rc-breakdown-item:hover { background:var(--surface2); transform:translateX(2px); }
     .rc-breakdown-item:last-child { border-bottom:none; }
     .rc-tag-badge { display:inline-block; font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:5px; background:rgba(125,63,190,.14); color:var(--purple); margin-top:5px; }
 
@@ -856,12 +857,6 @@
       </div>
     </div>
 
-  <!-- AUTO SUMMARY -->
-  <div class="card auto-summary-card" style="margin-bottom:22px;" id="autoSummaryCard">
-    <div class="card-t">📝 Executive Summary <span style="font-weight:400;color:var(--muted);font-size:11px;">(auto-generated)</span></div>
-    <div id="autoSummaryText">Not enough data yet to generate a summary.</div>
-  </div>
-
   <!-- KPI ROW 1: DSAT VOLUME -->
   <div class="kpi-row">
     <div class="kpi-card red">
@@ -945,14 +940,6 @@
     <div class="card-t">This Week vs Last Week</div>
     <div class="card-s" id="weekCompareSub">—</div>
     <div id="weekCompareBody"></div>
-  </div>
-  </div>
-  <div id="monthComparisonWrap">
-  <div class="sec">🗓️ Month-over-Month Comparison</div>
-  <div class="card" style="margin-bottom:22px;">
-    <div class="card-t">This Month vs Last Month</div>
-    <div class="card-s" id="monthCompareSub">—</div>
-    <div id="monthCompareBody"></div>
   </div>
   </div>
   </div>
@@ -1094,19 +1081,14 @@
       <div class="zone-icon">🏆</div>
       <div>
         <div class="zone-title">Leaderboard</div>
-        <div class="zone-desc">Who's improving fastest, and who needs attention against target</div>
+        <div class="zone-desc">Who's improving fastest, week over week</div>
       </div>
     </div>
-    <div class="grid2">
+    <div class="grid2" style="grid-template-columns:1fr;">
       <div class="card">
         <div class="card-t">🚀 Most Improved (Week-over-Week DSAT %)</div>
         <div class="card-s">Biggest drop in DSAT % vs the previous week (min. 3 rated cases each week)</div>
         <div id="lbMostImproved"></div>
-      </div>
-      <div class="card">
-        <div class="card-t">⚠️ Needs Attention (Furthest Below Target)</div>
-        <div class="card-s">Ranked by the gap between current CSAT % and its target</div>
-        <div id="lbNeedsAttention"></div>
       </div>
     </div>
   </div>
@@ -2030,8 +2012,8 @@ function renderAutoSummary(scoped) {
 // ═══════════════════════════════════════════
 function renderLeaderboard() {
   const improvedEl = document.getElementById('lbMostImproved');
-  const attentionEl = document.getElementById('lbNeedsAttention');
-  if (!improvedEl || !attentionEl) return;
+  const attentionEl = document.getElementById('lbNeedsAttention'); // card removed; kept null-safe below
+  if (!improvedEl) return;
 
   const scoped = getScopedRecords('ALL', 'ALL', 'ALL'); // leaderboard always floor-wide, scoped by AM drill only below
   const atAmLevel = currentAM === 'ALL';
@@ -2042,7 +2024,7 @@ function renderLeaderboard() {
 
   if (!trend.available) {
     improvedEl.innerHTML = '<div class="lb-empty">Needs at least 2 full weeks of data.</div>';
-    attentionEl.innerHTML = '<div class="lb-empty">Needs at least 2 full weeks of data.</div>';
+    if (attentionEl) attentionEl.innerHTML = '<div class="lb-empty">Needs at least 2 full weeks of data.</div>';
     return;
   }
 
@@ -2063,6 +2045,7 @@ function renderLeaderboard() {
       <span class="lb-delta ${g.delta<0?'good':'bad'}">${g.delta<0?'▼':'▲'} ${Math.abs(g.delta).toFixed(1)}pt</span>
     </div>`).join('') : '<div class="lb-empty">No group has enough data in both weeks yet.</div>';
 
+  if (!attentionEl) return;
   const attention = [];
   Object.keys(trend.thisWeek).forEach(name => {
     if (name === 'Unassigned') return;
@@ -2608,6 +2591,7 @@ function clearTargetEntry() {
 const ROOT_CAUSE_KEY = 'dsat_root_cause_log';
 const ROOT_CAUSE_OPTIONS = ['Handling skills', 'Lack of empathy', 'Delay respond', 'wrong solution', 'Lack of knowledge', 'Process', 'courier daley', 'merchant serivce', 'food quality', 'Customer attitude'];
 let rootCauseLog = {}; // { caseId: { rootCause, updatedAt } }
+let lastRootCauseGroups = {}; // { rootCauseLabel: [caseObj, ...] } — rebuilt each render, used by the click-through
 
 function loadRootCauseLog() {
   try {
@@ -2643,13 +2627,32 @@ function renderRootCauseBreakdown(dsatCases) {
   }
   subEl.textContent = `${tagged.length} of ${dsatCases.length} DSAT cases tagged with a root cause (${(tagged.length/dsatCases.length*100).toFixed(1)}%)`;
   const counts = {};
-  tagged.forEach(c => { const rc = rootCauseLog[c.id].rootCause; counts[rc] = (counts[rc]||0)+1; });
+  const groups = {};
+  tagged.forEach(c => {
+    const rc = rootCauseLog[c.id].rootCause;
+    counts[rc] = (counts[rc]||0)+1;
+    (groups[rc] = groups[rc] || []).push(c);
+  });
+  lastRootCauseGroups = groups;
   const sorted = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
   const maxCount = counts[sorted[0]] || 1;
   bodyEl.innerHTML = sorted.map(rc => {
     const pct = (counts[rc]/maxCount*100).toFixed(0);
-    return `<div class="rc-breakdown-item"><span class="rank-lbl">${rc}</span><div class="rank-bar-w" style="width:140px;"><div class="rank-bar-i" style="width:${pct}%; background:linear-gradient(90deg,#7d3fbe,#ba68c8);"></div></div><span class="rank-cnt" style="color:var(--purple);">${counts[rc]}</span></div>`;
+    return `<div class="rc-breakdown-item" title="Click to see these cases"><span class="rank-lbl">${rc}</span><div class="rank-bar-w" style="width:140px;"><div class="rank-bar-i" style="width:${pct}%; background:linear-gradient(90deg,#7d3fbe,#ba68c8);"></div></div><span class="rank-cnt" style="color:var(--purple);">${counts[rc]}</span></div>`;
   }).join('');
+  bodyEl.querySelectorAll('.rc-breakdown-item').forEach((el, i) => {
+    el.addEventListener('click', () => openRootCauseCases(sorted[i]));
+  });
+}
+
+function openRootCauseCases(rc) {
+  const cases = (lastRootCauseGroups[rc] || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  openPanel({
+    label: `Root Cause: ${rc}`,
+    cases,
+    icon: '🧭',
+    sub: `${cases.length} DSAT case${cases.length===1?'':'s'} tagged as "${rc}"`
+  });
 }
 
 function openCoachModal(agentName, opts) {

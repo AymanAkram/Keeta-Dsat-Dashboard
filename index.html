@@ -293,6 +293,7 @@
     .zone--overview .zone-icon { background:linear-gradient(135deg, rgba(74,144,217,.18), rgba(74,144,217,.05)); }
     .zone--faq .zone-icon { background:linear-gradient(135deg, rgba(156,106,222,.2), rgba(156,106,222,.06)); }
     .zone--rankings .zone-icon { background:linear-gradient(135deg, rgba(242,151,29,.2), rgba(242,151,29,.06)); }
+    .zone--leaderboard .zone-icon { background:linear-gradient(135deg, rgba(251,229,5,.3), rgba(251,229,5,.08)); }
     .zone--coaching .zone-icon { background:linear-gradient(135deg, rgba(251,229,5,.28), rgba(251,229,5,.08)); }
     .zone-title { font-size:16px; font-weight:800; color:var(--text); letter-spacing:-.1px; }
     .zone-desc { font-size:11.5px; color:var(--muted); margin-top:1px; }
@@ -464,33 +465,6 @@
     .coach-note-cell { max-width:220px; font-size:11.5px; color:var(--subtext); line-height:1.4; }
     .coach-empty { text-align:center; padding:34px; color:var(--muted); font-size:12.5px; }
 
-    /* COACHING KPI STRIP + FILTERS + GROUPED TIMELINE (agent coaching file) */
-    .kpi-row-4 { grid-template-columns:repeat(4,1fr); }
-    .coach-group-list { display:flex; flex-direction:column; gap:10px; }
-    .coach-group-card { border:1px solid var(--border); border-radius:12px; background:var(--surface2); overflow:hidden; transition:border-color .15s var(--ease); }
-    .coach-group-card.has-overdue { border-color:rgba(239,83,80,.5); }
-    .coach-group-head { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; flex-wrap:wrap; }
-    .coach-group-head:hover { background:var(--surface3); }
-    .coach-group-title { font-size:13px; font-weight:700; color:var(--subtext); }
-    .coach-group-sub { font-size:10.5px; color:var(--muted); margin-top:1px; }
-    .coach-group-count { font-size:10.5px; font-weight:700; color:var(--muted); background:var(--surface); border:1px solid var(--border); padding:2px 8px; border-radius:20px; white-space:nowrap; }
-    .coach-group-chev { margin-left:auto; color:var(--muted); transition:transform .2s var(--ease); flex-shrink:0; }
-    .coach-group-card.open .coach-group-chev { transform:rotate(180deg); }
-    .coach-group-add { background:rgba(39,185,146,.14); border:1px solid rgba(39,185,146,.35); color:var(--keeta-green); font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:7px; cursor:pointer; white-space:nowrap; transition:background .15s var(--ease); }
-    .coach-group-add:hover { background:rgba(39,185,146,.24); }
-    .coach-timeline { display:none; padding:0 14px 14px; border-top:1px solid var(--border); }
-    .coach-group-card.open .coach-timeline { display:block; }
-    .coach-timeline-item { position:relative; padding:12px 0 12px 20px; border-left:2px solid var(--border); margin-left:5px; }
-    .coach-timeline-item:last-child { padding-bottom:2px; }
-    .coach-timeline-item::before { content:''; position:absolute; left:-6px; top:16px; width:10px; height:10px; border-radius:50%; background:var(--surface2); border:2px solid var(--muted); }
-    .coach-timeline-item.pending::before { border-color:var(--yellow); }
-    .coach-timeline-item.overdue::before { border-color:#ef5350; }
-    .coach-timeline-item.improved::before { border-color:var(--keeta-green,#1c8f70); }
-    .coach-timeline-item.no-change::before { border-color:var(--muted); }
-    .coach-timeline-dates { font-size:10.5px; color:var(--muted); margin-bottom:4px; }
-    .coach-filter-empty { text-align:center; padding:24px; color:var(--muted); font-size:12px; }
-    @media(max-width:900px) { .kpi-row-4 { grid-template-columns:repeat(2,1fr); } }
-
     /* COACH MODAL */
     .coach-modal-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,10,.55); z-index:110; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
     .coach-modal-overlay.open { display:flex; }
@@ -510,7 +484,58 @@
     .coach-delete-btn { background:rgba(239,83,80,.12); border:1px solid rgba(239,83,80,.3); color:#ef5350; font-size:12px; font-weight:700; padding:10px 16px; border-radius:9px; cursor:pointer; margin-right:auto; transition:background .15s var(--ease); }
     .coach-delete-btn:hover { background:rgba(239,83,80,.2); }
 
+    /* AUTO SUMMARY */
+    .auto-summary-card { border-left:4px solid var(--keeta-green,#1c8f70); }
+    .auto-summary-card .card-t { display:flex; align-items:center; gap:8px; }
+    #autoSummaryText { font-size:13px; line-height:1.75; color:var(--subtext); }
+    #autoSummaryText b { color:var(--text); }
+    #autoSummaryText .as-good { color:#3fae66; font-weight:700; }
+    body.theme-dark #autoSummaryText .as-good { color:#66bb6a; }
+    #autoSummaryText .as-bad { color:#ef5350; font-weight:700; }
+
+    /* TARGET PROGRESS BAR (per AM/TL rank item) */
+    .target-row { display:flex; align-items:center; gap:8px; padding:2px 10px 8px 36px; margin-top:-6px; }
+    .target-progress-w { flex:1; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden; }
+    .target-progress-i { height:100%; border-radius:3px; transition:width .4s var(--ease); }
+    .target-progress-lbl { font-size:10px; color:var(--muted); white-space:nowrap; min-width:120px; text-align:right; }
+    .target-edit-btn { background:none; border:none; cursor:pointer; font-size:11px; padding:2px 4px; opacity:.65; transition:opacity .15s var(--ease); }
+    .target-edit-btn:hover { opacity:1; }
+
+    /* LEADERBOARD */
+    .lb-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; border-bottom:1px solid var(--border); }
+    .lb-item:last-child { border-bottom:none; }
+    .lb-rank { font-size:15px; width:22px; text-align:center; }
+    .lb-name { flex:1; font-size:12.5px; font-weight:700; color:var(--subtext); }
+    .lb-sub { font-size:10.5px; color:var(--muted); }
+    .lb-delta { font-size:12px; font-weight:800; padding:3px 9px; border-radius:6px; white-space:nowrap; }
+    .lb-delta.good { background:rgba(39,185,146,.16); color:var(--keeta-green,#1c8f70); }
+    .lb-delta.bad { background:rgba(239,83,80,.16); color:#ef5350; }
+    .lb-empty { text-align:center; padding:20px; color:var(--muted); font-size:12px; }
+
+    /* ROOT CAUSE */
+    .rc-select { width:100%; margin-top:6px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-size:10.5px; padding:5px 7px; border-radius:6px; outline:none; }
+    .rc-breakdown-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border-bottom:1px solid var(--border); }
+    .rc-breakdown-item:last-child { border-bottom:none; }
+    .rc-tag-badge { display:inline-block; font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:5px; background:rgba(125,63,190,.14); color:var(--purple); margin-top:5px; }
+
+    /* AGENT PROFILE MODAL */
+    .agent-profile-panel { width:min(880px,95vw); }
+    .ap-stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+    .ap-stat { background:var(--surface2); border-radius:10px; padding:10px 12px; text-align:center; }
+    .ap-stat-val { font-size:18px; font-weight:800; }
+    .ap-stat-lbl { font-size:10px; color:var(--muted); margin-top:2px; }
+    .ap-section-t { font-size:12.5px; font-weight:800; color:var(--text); margin:16px 0 8px; }
+    .ap-coach-row { font-size:11.5px; color:var(--subtext); padding:7px 0; border-bottom:1px solid var(--border); }
+    .ap-coach-row:last-child { border-bottom:none; }
+    .ap-case-row { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--subtext); padding:6px 0; border-bottom:1px solid var(--border); }
+    .ap-case-row:last-child { border-bottom:none; }
+
+    /* GENERIC SMALL MODAL (targets) */
+    .util-modal-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,10,.55); z-index:115; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+    .util-modal-overlay.open { display:flex; }
+
     @media(max-width:900px) {
+      .ap-stat-row { grid-template-columns:repeat(2,1fr); }
       .kpi-row { grid-template-columns:repeat(1,1fr); }
       .grid2 { grid-template-columns:1fr; }
       .main { padding:16px; } .header { padding:18px 16px 14px; } .toolbar { padding:12px 16px; }
@@ -566,6 +591,48 @@
   </div>
 </div>
 
+<!-- TARGET MODAL -->
+<div class="util-modal-overlay" id="targetModalOverlay">
+  <div class="coach-modal" style="width:min(380px,92vw);">
+    <h3 id="targetModalTitle">Set CSAT Target</h3>
+    <div class="sub" id="targetModalSub">—</div>
+    <div class="coach-field">
+      <label>CSAT Target (%)</label>
+      <input type="number" id="targetValueInput" min="0" max="100" step="1" placeholder="e.g. 72" />
+    </div>
+    <div class="coach-modal-actions">
+      <button class="coach-delete-btn" id="targetClearBtn" onclick="clearTargetEntry()">↺ Reset to Default</button>
+      <button class="coach-cancel-btn" onclick="closeTargetModal()">Cancel</button>
+      <button class="coach-save-btn" onclick="saveTargetEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT PROFILE MODAL -->
+<div class="panel-overlay" id="agentProfileOverlay">
+  <div class="panel agent-profile-panel">
+    <div class="panel-head">
+      <div class="panel-icon">👤</div>
+      <div>
+        <div class="panel-title" id="apAgentName">Agent</div>
+        <div class="panel-subtitle" id="apAgentSub">Loading…</div>
+      </div>
+      <div class="panel-close" onclick="closeAgentProfile()">✕</div>
+    </div>
+    <div class="panel-body">
+      <div class="ap-stat-row" id="apStatRow"></div>
+      <div class="ap-section-t">📈 Performance Curve — CSAT % vs DSAT % Over Time</div>
+      <div style="position:relative;height:180px;">
+        <canvas id="agentProfileChart"></canvas>
+      </div>
+      <div class="ap-section-t">🎯 Coaching History</div>
+      <div id="apCoachHistory"><div class="lb-empty">No coaching follow-ups logged for this agent yet.</div></div>
+      <div class="ap-section-t">😠 Recent DSAT Cases</div>
+      <div id="apCaseHistory"><div class="lb-empty">No DSAT cases.</div></div>
+    </div>
+  </div>
+</div>
+
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="dashCloseMobileSidebar()"></div>
 <div class="app-shell">
 <aside class="sidebar" id="appSidebar">
@@ -592,6 +659,10 @@
     <a class="sidebar-link" href="#zoneRankings" data-tip="Rankings &amp; Agents">
       <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.5"></circle><path d="M8.2 12.2L6 21l6-3 6 3-2.2-8.8"></path></svg></span>
       <span class="lbl">Rankings &amp; Agents</span>
+    </a>
+    <a class="sidebar-link" href="#zoneLeaderboard" data-tip="Leaderboard">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M7 6H4a2 2 0 0 0 2 4"></path><path d="M17 6h3a2 2 0 0 1-2 4"></path></svg></span>
+      <span class="lbl">Leaderboard</span>
     </a>
     <a class="sidebar-link" href="#zoneCoaching" data-tip="Coaching">
       <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"></circle></svg></span>
@@ -719,6 +790,12 @@
       </div>
     </div>
 
+  <!-- AUTO SUMMARY -->
+  <div class="card auto-summary-card" style="margin-bottom:22px;" id="autoSummaryCard">
+    <div class="card-t">📝 Executive Summary <span style="font-weight:400;color:var(--muted);font-size:11px;">(auto-generated)</span></div>
+    <div id="autoSummaryText">Not enough data yet to generate a summary.</div>
+  </div>
+
   <!-- KPI ROW 1: DSAT VOLUME -->
   <div class="kpi-row">
     <div class="kpi-card red">
@@ -804,6 +881,14 @@
     <div id="weekCompareBody"></div>
   </div>
   </div>
+  <div id="monthComparisonWrap">
+  <div class="sec">🗓️ Month-over-Month Comparison</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-t">This Month vs Last Month</div>
+    <div class="card-s" id="monthCompareSub">—</div>
+    <div id="monthCompareBody"></div>
+  </div>
+  </div>
   </div>
 
   <div class="zone zone--faq" id="zoneFaq">
@@ -837,6 +922,12 @@
         <div class="donut-legend" id="faqDonutLegend"></div>
       </div>
     </div>
+  </div>
+
+  <div class="sec">🔎 Root Cause Breakdown <span style="font-weight:400;font-size:11px;color:var(--muted);">(manually tagged during coaching / case review)</span></div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-s" id="rootCauseSub">—</div>
+    <div id="rootCauseBreakdown"></div>
   </div>
   </div>
 
@@ -932,6 +1023,28 @@
   </div>
   </div>
 
+  <div class="zone zone--leaderboard" id="zoneLeaderboard">
+    <div class="zone-head">
+      <div class="zone-icon">🏆</div>
+      <div>
+        <div class="zone-title">Leaderboard</div>
+        <div class="zone-desc">Who's improving fastest, and who needs attention against target</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-t">🚀 Most Improved (Week-over-Week DSAT %)</div>
+        <div class="card-s">Biggest drop in DSAT % vs the previous week (min. 3 rated cases each week)</div>
+        <div id="lbMostImproved"></div>
+      </div>
+      <div class="card">
+        <div class="card-t">⚠️ Needs Attention (Furthest Below Target)</div>
+        <div class="card-s">Ranked by the gap between current CSAT % and its target</div>
+        <div id="lbNeedsAttention"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="zone zone--coaching" id="zoneCoaching">
     <div class="zone-head">
       <div class="zone-icon">🎯</div>
@@ -940,43 +1053,11 @@
         <div class="zone-desc">Flag agents, track follow-ups, and measure improvement</div>
       </div>
     </div>
-  <!-- COACHING KPI STRIP -->
-  <div class="kpi-row kpi-row-4" id="coachKpiRow">
-    <div class="kpi-card red" style="cursor:pointer;" onclick="setCoachFilter('overdue')" title="Show overdue follow-ups">
-      <div class="kpi-icon">🔴</div>
-      <div class="kpi-label">Overdue Follow-ups</div>
-      <div class="kpi-value red" id="coachKpiOverdue">0</div>
-      <div class="kpi-sub">Past follow-up date, still pending</div>
-    </div>
-    <div class="kpi-card orange" style="cursor:pointer;" onclick="setCoachFilter('dueWeek')" title="Show follow-ups due within 7 days">
-      <div class="kpi-icon">🟡</div>
-      <div class="kpi-label">Due This Week</div>
-      <div class="kpi-value orange" id="coachKpiDueWeek">0</div>
-      <div class="kpi-sub">Follow-up date within 7 days</div>
-    </div>
-    <div class="kpi-card blue" style="cursor:pointer;" onclick="setCoachFilter('active')" title="Show all pending/overdue sessions">
-      <div class="kpi-icon">📋</div>
-      <div class="kpi-label">Active Flags</div>
-      <div class="kpi-value blue" id="coachKpiActive">0</div>
-      <div class="kpi-sub">Pending or overdue sessions</div>
-    </div>
-    <div class="kpi-card green" style="cursor:pointer;" onclick="setCoachFilter('resolved')" title="Show resolved sessions">
-      <div class="kpi-icon">📈</div>
-      <div class="kpi-label">Improvement Rate (This Month)</div>
-      <div class="kpi-value green" id="coachKpiImproveRate">—</div>
-      <div class="kpi-sub" id="coachKpiImproveSub">No resolved sessions yet this month</div>
-    </div>
-  </div>
-
   <div class="card" style="margin-bottom:22px;">
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
       <div>
         <div class="card-t">Coaching & Improvement Tracking</div>
-        <div class="card-s" style="margin-bottom:0;">Every follow-up is grouped into that agent's (or topic's) coaching file as one timeline. Flag any agent from the ranking table above, or an FAQ topic from the FAQ list — the dashboard compares performance before/after the flag date, and tracks the specific topic when a category is set.</div>
-      </div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="upload-btn" onclick="exportCoachingTrackerXlsx()">⬇ Extract</button>
-        <button class="upload-btn" onclick="exportCoachingTrackerPdf()">📄 Export PDF</button>
+        <div class="card-s" style="margin-bottom:0;">Flag any agent from the ranking table above, and the dashboard will automatically compare their DSAT rate before and after the flag date</div>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
@@ -986,17 +1067,16 @@
       <button class="reset-btn" onclick="pullCoachingFromRemote(true)">🔄 Sync Now</button>
       <span class="file-lbl" id="coachSyncStatus"><span class="sync-dot off"></span>Saved locally only</span>
     </div>
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
-      <span class="filter-lbl">Filter</span>
-      <div class="view-mode-row" id="coachFilterRow">
-        <button class="vm-btn active" data-coach-filter="all" onclick="setCoachFilter('all')">All</button>
-        <button class="vm-btn" data-coach-filter="overdue" onclick="setCoachFilter('overdue')">🔴 Overdue</button>
-        <button class="vm-btn" data-coach-filter="dueWeek" onclick="setCoachFilter('dueWeek')">🟡 Due This Week</button>
-        <button class="vm-btn" data-coach-filter="active" onclick="setCoachFilter('active')">📋 Active</button>
-        <button class="vm-btn" data-coach-filter="resolved" onclick="setCoachFilter('resolved')">✅ Resolved</button>
-      </div>
+    <div class="tbl-wrap" id="coachTrackerWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Agent</th><th>Team Leader</th><th>AM</th><th>Note</th><th>Flagged</th><th>Follow-up</th><th>Status / Impact</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="coachTrackerBody"></tbody>
+      </table>
     </div>
-    <div id="coachGroupList" class="coach-group-list"></div>
     <div class="coach-empty" id="coachEmptyMsg" style="display:none;">No follow-ups flagged yet. Click the "🎯" button next to any agent in the ranking table above to get started.</div>
   </div>
   </div>
@@ -1023,39 +1103,10 @@ function getAgentsWithActiveCoaching() {
   const activeSet = new Set();
   coachingLog.forEach(entry => {
     if (entry.scopeType === 'faq') return; // suggestion badge only applies to agent-level coaching
-    const impact = computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent));
+    const impact = computeCoachingImpact(entry, byAgent[entry.agent] || []);
     if (impact.status === 'pending' || impact.status === 'overdue') activeSet.add(entry.agent);
   });
   return activeSet;
-}
-
-// Records used to measure a coaching entry's before/after impact. For an agent-level flag
-// that was tagged with a specific FAQ category, we track improvement on THAT topic for the
-// agent (not their overall DSAT) — this is what the coach actually followed up on.
-function getRelevantRecordsForEntry(entry, byAgent) {
-  if (entry.scopeType === 'faq') {
-    return ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
-      (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
-      (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
-  }
-  let recs = (byAgent && byAgent[entry.agent]) || [];
-  if (entry.category) recs = recs.filter(r => r.faq === entry.category);
-  return recs;
-}
-
-function isDueThisWeek(followUpDate) {
-  if (!followUpDate) return false;
-  const now = new Date();
-  const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const in7 = new Date(todayMid); in7.setDate(in7.getDate() + 7);
-  const fu = new Date(followUpDate + 'T00:00:00');
-  return fu >= todayMid && fu <= in7;
-}
-
-function getEntryGroupKey(entry) {
-  return entry.scopeType === 'faq'
-    ? `faq:${entry.faqTopic}:${entry.scopeAM}:${entry.scopeTL}`
-    : `agent:${entry.agent}`;
 }
 
 
@@ -1073,7 +1124,7 @@ let viewMode = 'mtd'; // 'mtd' | 'daily'
 let selectedDprDay = null;
 let currentTL = 'ALL';
 let currentAgent = 'ALL';
-let trendChart, faqBarChartInst, faqDonutInst, agentBarChartInst, tlBarChartInst, amBarChartInst, pctTrendChartInst;
+let trendChart, faqBarChartInst, faqDonutInst, agentBarChartInst, tlBarChartInst, amBarChartInst, pctTrendChartInst, agentProfileChartInst;
 let trendGranularity = 'day'; // 'day' | 'week'
 let hierarchy = {};         // { amName: Set(tlNames) }
 let tlAgents = {};          // { "am|tl": Set(agentNames) }
@@ -1474,9 +1525,13 @@ function applyFilters() {
     safeRender(() => renderTrend(dsatCases, scoped), 'Daily Trend');
     safeRender(() => renderPctTrend(scoped), 'CSAT/DSAT Trend');
     safeRender(() => renderPeriodComparisons(scoped), 'Period Comparison');
+    safeRender(() => renderMonthComparison(scoped), 'Month Comparison');
+    safeRender(() => renderAutoSummary(scoped), 'Auto Summary');
+    safeRender(() => renderLeaderboard(), 'Leaderboard');
   }
   safeRender(() => renderFAQCharts(scoped, dsatCases, faqStats), 'FAQ Charts');
   safeRender(() => renderFAQList(scoped, dsatCases, faqStats), 'FAQ List');
+  safeRender(() => renderRootCauseBreakdown(dsatCases), 'Root Cause Breakdown');
   safeRender(() => renderAgentChart(scoped, dsatCases, agentStats), 'Agent Chart');
   safeRender(() => renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend), 'Agent Table');
   safeRender(() => {
@@ -1779,6 +1834,187 @@ function renderWeekComparison(scoped) {
     compareRowHtml('Total Rated Surveys', thisStats.grandTotal, lastStats.grandTotal, '', null, 'var(--subtext)');
 }
 
+// ═══════════════════════════════════════════
+// MONTH-OVER-MONTH COMPARISON
+// ═══════════════════════════════════════════
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function getAvailableMonths() {
+  const days = getFullDayRange();
+  const seen = [];
+  days.forEach(d => { const m = Number(d.split('/')[1]) - 1; if (!seen.includes(m)) seen.push(m); });
+  return seen; // chronological order of appearance (data is date-sorted)
+}
+
+function renderMonthComparison(scoped) {
+  const subEl = document.getElementById('monthCompareSub');
+  const bodyEl = document.getElementById('monthCompareBody');
+  if (!subEl || !bodyEl) return;
+  const months = getAvailableMonths();
+  if (months.length < 2) {
+    bodyEl.innerHTML = '<div class="cmp-empty">Needs data spanning at least 2 calendar months to compare.</div>';
+    subEl.textContent = 'Not enough months of data yet';
+    return;
+  }
+  const curMonth = months[months.length - 1];
+  const prevMonth = months[months.length - 2];
+  const curRecs = scoped.filter(r => r.rate && Number(r.date.split('/')[1]) - 1 === curMonth);
+  const prevRecs = scoped.filter(r => r.rate && Number(r.date.split('/')[1]) - 1 === prevMonth);
+  const curStats = computeRateStats(curRecs);
+  const prevStats = computeRateStats(prevRecs);
+  subEl.textContent = `${MONTH_NAMES[curMonth]} vs ${MONTH_NAMES[prevMonth]}`;
+  bodyEl.innerHTML =
+    compareRowHtml('DSAT %', curStats.dsatPct, prevStats.dsatPct, '%', false, '#ef5350') +
+    compareRowHtml('CSAT %', curStats.csatPct, prevStats.csatPct, '%', true, 'var(--keeta-green)') +
+    compareRowHtml('DSAT Cases', curStats.counts[1], prevStats.counts[1], '', false, '#ef5350') +
+    compareRowHtml('Total Rated Surveys', curStats.grandTotal, prevStats.grandTotal, '', null, 'var(--subtext)');
+}
+
+// ═══════════════════════════════════════════
+// AUTO-GENERATED EXECUTIVE SUMMARY
+// ═══════════════════════════════════════════
+function computeGroupWeekTrend(scoped, groupKeyFn) {
+  const days = getFullDayRange();
+  if (days.length < 8) return { available: false, thisWeek: {}, lastWeek: {} };
+  const lastIdx = days.length - 1;
+  const thisWeekDays = new Set(days.slice(Math.max(0, lastIdx-6), lastIdx+1));
+  const lastWeekDays = new Set(days.slice(Math.max(0, lastIdx-13), Math.max(0, lastIdx-6)));
+  if (!lastWeekDays.size) return { available: false, thisWeek: {}, lastWeek: {} };
+  const groupBy = (recs) => {
+    const byKey = {};
+    recs.forEach(r => {
+      if (!r.rate) return;
+      const k = groupKeyFn(r);
+      if (!byKey[k]) byKey[k] = {1:0,2:0,3:0,4:0,5:0};
+      byKey[k][r.rate]++;
+    });
+    const out = {};
+    Object.keys(byKey).forEach(k => {
+      const c = byKey[k];
+      const total = c[1]+c[2]+c[3]+c[4]+c[5];
+      out[k] = { dsatPct: total ? (c[1]/total*100) : 0, csatPct: total ? ((c[4]+c[5])/total*100) : 0, total, dsatCount: c[1] };
+    });
+    return out;
+  };
+  return {
+    available: true,
+    thisWeek: groupBy(scoped.filter(r => thisWeekDays.has(r.date))),
+    lastWeek: groupBy(scoped.filter(r => lastWeekDays.has(r.date)))
+  };
+}
+
+function renderAutoSummary(scoped) {
+  const el = document.getElementById('autoSummaryText');
+  if (!el) return;
+  const days = getFullDayRange();
+  if (days.length < 8) {
+    el.textContent = 'Not enough data yet to generate a summary — needs at least two full weeks of data.';
+    return;
+  }
+  const lastIdx = days.length - 1;
+  const thisWeekDays = new Set(days.slice(Math.max(0, lastIdx-6), lastIdx+1));
+  const lastWeekDays = new Set(days.slice(Math.max(0, lastIdx-13), Math.max(0, lastIdx-6)));
+  const thisStats = computeRateStats(scoped.filter(r => thisWeekDays.has(r.date) && r.rate));
+  const lastStats = computeRateStats(scoped.filter(r => lastWeekDays.has(r.date) && r.rate));
+  const dsatDelta = thisStats.dsatPct - lastStats.dsatPct;
+
+  // Which TL/AM is driving DSAT this week (highest DSAT case count)
+  const tlTrend = computeGroupWeekTrend(scoped, r => r.tl);
+  const amTrend = computeGroupWeekTrend(scoped, r => r.am);
+  const driverGroup = currentAM === 'ALL' ? amTrend : tlTrend;
+  const driverLabel = currentAM === 'ALL' ? 'team (AM)' : 'team (TL)';
+  let topDriver = null;
+  if (driverGroup.available) {
+    Object.keys(driverGroup.thisWeek).forEach(k => {
+      if (k === 'Unassigned') return;
+      const v = driverGroup.thisWeek[k];
+      if (!topDriver || v.dsatCount > topDriver.dsatCount) topDriver = { name: k, ...v };
+    });
+  }
+
+  // Best improvement this week — smallest (most negative) DSAT% delta among agents with enough volume
+  const agentTrend = computeAgentWeekTrend(scoped);
+  let bestImprover = null;
+  if (agentTrend.available) {
+    Object.keys(agentTrend.thisWeek).forEach(name => {
+      const cur = agentTrend.thisWeek[name];
+      const prev = agentTrend.lastWeek[name];
+      if (!prev || prev.total < 3 || cur.total < 3) return;
+      const delta = cur.dsatPct - prev.dsatPct;
+      if (!bestImprover || delta < bestImprover.delta) bestImprover = { name, delta };
+    });
+  }
+
+  const dirWord = dsatDelta <= -0.05 ? 'down' : (dsatDelta >= 0.05 ? 'up' : 'flat');
+  const dirCls = dirWord === 'down' ? 'as-good' : (dirWord === 'up' ? 'as-bad' : '');
+  let text = `DSAT % is <span class="${dirCls}">${dirWord}${dirWord!=='flat' ? ' ' + Math.abs(dsatDelta).toFixed(1) + ' points' : ''}</span> this week (<b>${thisStats.dsatPct.toFixed(1)}%</b> vs ${lastStats.dsatPct.toFixed(1)}% last week), from ${thisStats.counts[1]} DSAT cases out of ${thisStats.grandTotal} rated surveys.`;
+  if (topDriver && topDriver.dsatCount > 0) {
+    text += ` The largest contributor is <b>${topDriver.name}</b> ${driverLabel} with ${topDriver.dsatCount} DSAT case${topDriver.dsatCount!==1?'s':''} this week (${topDriver.dsatPct.toFixed(1)}% DSAT).`;
+  }
+  if (bestImprover) {
+    text += bestImprover.delta <= -1
+      ? ` The best improvement came from <b>${bestImprover.name}</b>, down <span class="as-good">${Math.abs(bestImprover.delta).toFixed(1)} points</span> vs last week.`
+      : ` No agent showed a significant week-over-week improvement.`;
+  }
+  el.innerHTML = text;
+}
+
+// ═══════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════
+function renderLeaderboard() {
+  const improvedEl = document.getElementById('lbMostImproved');
+  const attentionEl = document.getElementById('lbNeedsAttention');
+  if (!improvedEl || !attentionEl) return;
+
+  const scoped = getScopedRecords('ALL', 'ALL', 'ALL'); // leaderboard always floor-wide, scoped by AM drill only below
+  const atAmLevel = currentAM === 'ALL';
+  const relevantScoped = atAmLevel ? scoped : scoped.filter(r => r.am === currentAM);
+  const groupKeyFn = atAmLevel ? (r => r.am) : (r => r.tl);
+  const label = atAmLevel ? 'AM' : 'TL';
+  const trend = computeGroupWeekTrend(relevantScoped, groupKeyFn);
+
+  if (!trend.available) {
+    improvedEl.innerHTML = '<div class="lb-empty">Needs at least 2 full weeks of data.</div>';
+    attentionEl.innerHTML = '<div class="lb-empty">Needs at least 2 full weeks of data.</div>';
+    return;
+  }
+
+  const improved = [];
+  Object.keys(trend.thisWeek).forEach(name => {
+    if (name === 'Unassigned') return;
+    const cur = trend.thisWeek[name];
+    const prev = trend.lastWeek[name];
+    if (!prev || prev.total < 3 || cur.total < 3) return;
+    improved.push({ name, delta: cur.dsatPct - prev.dsatPct, cur, prev });
+  });
+  improved.sort((a,b) => a.delta - b.delta);
+  const topImproved = improved.slice(0, 5);
+  improvedEl.innerHTML = topImproved.length ? topImproved.map((g,i) => `
+    <div class="lb-item">
+      <span class="lb-rank">${['🥇','🥈','🥉'][i] || (i+1)}</span>
+      <div style="flex:1;"><div class="lb-name">${g.name}</div><div class="lb-sub">${label} — now ${g.cur.dsatPct.toFixed(1)}% DSAT (was ${g.prev.dsatPct.toFixed(1)}%)</div></div>
+      <span class="lb-delta ${g.delta<0?'good':'bad'}">${g.delta<0?'▼':'▲'} ${Math.abs(g.delta).toFixed(1)}pt</span>
+    </div>`).join('') : '<div class="lb-empty">No group has enough data in both weeks yet.</div>';
+
+  const attention = [];
+  Object.keys(trend.thisWeek).forEach(name => {
+    if (name === 'Unassigned') return;
+    const cur = trend.thisWeek[name];
+    const tgt = atAmLevel ? getEffectiveTarget(name, null) : getEffectiveTarget(currentAM, name);
+    const gap = tgt - cur.csatPct;
+    if (gap > 0) attention.push({ name, gap, cur, tgt });
+  });
+  attention.sort((a,b) => b.gap - a.gap);
+  const topAttention = attention.slice(0, 5);
+  attentionEl.innerHTML = topAttention.length ? topAttention.map(g => `
+    <div class="lb-item">
+      <span class="lb-rank">⚠️</span>
+      <div style="flex:1;"><div class="lb-name">${g.name}</div><div class="lb-sub">${label} — CSAT ${g.cur.csatPct.toFixed(1)}% vs target ${g.tgt}%</div></div>
+      <span class="lb-delta bad">-${g.gap.toFixed(1)}pt</span>
+    </div>`).join('') : '<div class="lb-empty">Everyone is meeting their target this week 🎉</div>';
+}
+
 function buildFaqStats(scoped) {
   const byFaq = {};
   scoped.forEach(r => {
@@ -1963,8 +2199,8 @@ function setAgentTargetFilter(val) {
 }
 
 function filterByTargetStatus(agentStats) {
-  if (agentTargetFilter === 'achieved') return agentStats.filter(a => a.csatPct >= CSAT_TARGET);
-  if (agentTargetFilter === 'below') return agentStats.filter(a => a.csatPct < CSAT_TARGET);
+  if (agentTargetFilter === 'achieved') return agentStats.filter(a => a.csatPct >= getEffectiveTarget(a.am, a.tl));
+  if (agentTargetFilter === 'below') return agentStats.filter(a => a.csatPct < getEffectiveTarget(a.am, a.tl));
   return agentStats;
 }
 let lastAgentTableData = [];
@@ -1978,16 +2214,17 @@ function buildAgentRow(a, rank, dsatCases, agentWeekTrend, activeCoachingSet) {
   const topFaqs = Object.keys(a.faqs).sort((x,y)=>a.faqs[y]-a.faqs[x]).slice(0,2).map(f=>`${f.length>20?f.slice(0,18)+'..':f} (${a.faqs[f]})`);
   const chips = topFaqs.map(f=>`<span class="chip">${f}</span>`).join('');
   const lowVolFlag = a.grandTotal < 10 ? '<span class="lowvol">⚠ low volume</span>' : '';
-  const hitTarget = a.csatPct >= CSAT_TARGET;
-  const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}">${hitTarget?'✓ Achieved':'✗ Below'}</span>`;
-  const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, CSAT_TARGET);
+  const effTarget = getEffectiveTarget(a.am, a.tl);
+  const hitTarget = a.csatPct >= effTarget;
+  const targetBadge = `<span class="target-badge ${hitTarget?'hit':'miss'}" title="Target: ${effTarget}%">${hitTarget?'✓ Achieved':'✗ Below'} (${effTarget}%)</span>`;
+  const hitsNeeded = computeHitsToAchieve(a.counts[4]+a.counts[5], a.grandTotal, effTarget);
   const hitsCell = hitTarget ? `<span style="color:#66bb6a;font-weight:700;">—</span>` : `<span style="color:var(--yellow);font-weight:700;">+${hitsNeeded} CSAT</span>`;
   const trendCell = agentTrendBadgeHtml(a.agent, agentWeekTrend);
   const hasActiveFlag = activeCoachingSet && activeCoachingSet.has(a.agent);
   const needsSuggestion = !hasActiveFlag && a.dsatPct >= COACHING_SUGGEST_THRESHOLD;
   const coachBtnClass = hasActiveFlag ? 'coach-btn' : (needsSuggestion ? 'coach-btn coach-btn-suggest' : 'coach-btn');
   const coachBtnLabel = hasActiveFlag ? '📝 Coached' : (needsSuggestion ? '🚨 Needs Follow-up' : '🎯 Coach');
-  const coachBtnHtml = `<button class="${coachBtnClass}" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${coachBtnLabel}</button>`;
+  const coachBtnHtml = `<button class="${coachBtnClass}" onclick="event.stopPropagation(); openCoachModal('${a.agent}')">${coachBtnLabel}</button> <button class="coach-btn" onclick="event.stopPropagation(); openAgentProfile('${a.agent}')">👤 Profile</button>`;
   const tr = document.createElement('tr');
   tr.className = 'trow';
   tr.dataset.agent = a.agent;
@@ -2022,6 +2259,8 @@ function appendAgentRows(rows, startIndex, dsatCases, agentWeekTrend, tbody, act
 }
 
 function renderAgentTable(scoped, dsatCases, agentStats, agentWeekTrend) {
+  const tgtLbl = document.getElementById('tableTargetLbl');
+  if (tgtLbl) tgtLbl.textContent = hasAnyCustomTargets() ? `${CSAT_TARGET}% default (varies per team — see badge)` : `${CSAT_TARGET}%`;
   const agentData = filterByTargetStatus(agentStats).slice().sort((a,b)=>b.dsatPct-a.dsatPct);
   lastAgentTableData = agentData;
   lastAgentTableDsatCases = dsatCases;
@@ -2089,6 +2328,13 @@ function renderAmRank() {
     el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${a.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(a.dsatPct*2.5,100)}%; background:${a.name==='Unassigned'?'#546e7a':getDsatColor(a.dsatPct)}"></div></div><span class="rank-cnt" style="color:${a.name==='Unassigned'?'#7b82a0':getDsatColor(a.dsatPct)}">${a.dsatPct.toFixed(1)}%</span>`;
     el.addEventListener('click', ()=> drillToAm(a.name));
     listEl.appendChild(el);
+    const tgt = getEffectiveTarget(a.name, null);
+    const hit = a.csatPct >= tgt;
+    const row = document.createElement('div');
+    row.className = 'target-row';
+    row.innerHTML = `<span class="target-progress-lbl">CSAT ${a.csatPct.toFixed(1)}% / target ${tgt}%</span><div class="target-progress-w"><div class="target-progress-i" style="width:${Math.min(a.csatPct/tgt*100,100)}%; background:${hit?'#66bb6a':'#ef5350'};"></div></div><button class="target-edit-btn" title="Set target for ${a.name}">✏️</button>`;
+    row.querySelector('.target-edit-btn').addEventListener('click', (e)=>{ e.stopPropagation(); openTargetModal('am', a.name, null); });
+    listEl.appendChild(row);
   });
 }
 
@@ -2126,6 +2372,13 @@ function renderTlRank(am) {
     el.innerHTML = `<span class="faq-num">${i+1}</span><span class="rank-lbl">${t.name}</span><div class="rank-bar-w"><div class="rank-bar-i" style="width:${Math.min(t.dsatPct*2.5,100)}%; background:${t.name==='Unassigned'?'#546e7a':getDsatColor(t.dsatPct)}"></div></div><span class="rank-cnt" style="color:${t.name==='Unassigned'?'#7b82a0':getDsatColor(t.dsatPct)}">${t.dsatPct.toFixed(1)}%</span>`;
     el.addEventListener('click', ()=> drillToTl(am, t.name));
     listEl.appendChild(el);
+    const tgt = getEffectiveTarget(am, t.name);
+    const hit = t.csatPct >= tgt;
+    const row = document.createElement('div');
+    row.className = 'target-row';
+    row.innerHTML = `<span class="target-progress-lbl">CSAT ${t.csatPct.toFixed(1)}% / target ${tgt}%</span><div class="target-progress-w"><div class="target-progress-i" style="width:${Math.min(t.csatPct/tgt*100,100)}%; background:${hit?'#66bb6a':'#ef5350'};"></div></div><button class="target-edit-btn" title="Set target for ${t.name}">✏️</button>`;
+    row.querySelector('.target-edit-btn').addEventListener('click', (e)=>{ e.stopPropagation(); openTargetModal('tl', am, t.name); });
+    listEl.appendChild(row);
   });
 }
 
@@ -2154,7 +2407,8 @@ function openPanel({ label, cases, icon, sub }) {
         <div class="case-faq">${c.faq}</div>
         <div class="case-agent"><div class="agent-dot"></div><span class="agent-lbl">${c.agent}</span><span class="tl-chip">${c.tl}</span><span class="am-chip">${c.am}</span></div>
         <div class="case-day">${c.date}</div>
-        <div style="margin-top:8px;"><button class="coach-btn" data-case-coach>🎯 Coach on this case</button></div>`;
+        <div style="margin-top:8px;"><button class="coach-btn" data-case-coach>🎯 Coach on this case</button></div>
+        ${rootCauseSelectHtml(c.id)}`;
       card.querySelector('[data-case-coach]').addEventListener('click', (e) => {
         e.stopPropagation();
         openCoachModal(c.agent, { caseId: c.id, faqPreset: c.faq });
@@ -2217,6 +2471,119 @@ function loadCoachingLog() {
 }
 function saveCoachingLog() {
   try { localStorage.setItem(COACHING_KEY, JSON.stringify(coachingLog)); } catch(e) {}
+}
+
+// ═══════════════════════════════════════════
+// CUSTOM TARGETS (per AM / per TL, overriding the global CSAT_TARGET)
+// ═══════════════════════════════════════════
+const CUSTOM_TARGETS_KEY = 'dsat_custom_targets';
+let customTargets = { am:{}, tl:{} }; // tl keyed as "AM|TL"
+let targetModalScope = null; // { type:'am'|'tl', am, tl }
+
+function loadCustomTargets() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TARGETS_KEY);
+    customTargets = raw ? JSON.parse(raw) : { am:{}, tl:{} };
+    if (!customTargets.am) customTargets.am = {};
+    if (!customTargets.tl) customTargets.tl = {};
+  } catch(e) { customTargets = { am:{}, tl:{} }; }
+}
+function saveCustomTargets() {
+  try { localStorage.setItem(CUSTOM_TARGETS_KEY, JSON.stringify(customTargets)); } catch(e) {}
+}
+function tlTargetKey(am, tl) { return am + '|' + tl; }
+
+// Effective target resolution: TL-level override > AM-level override > global default
+function getEffectiveTarget(am, tl) {
+  if (tl && customTargets.tl[tlTargetKey(am, tl)] !== undefined) return customTargets.tl[tlTargetKey(am, tl)];
+  if (am && customTargets.am[am] !== undefined) return customTargets.am[am];
+  return CSAT_TARGET;
+}
+function hasAnyCustomTargets() {
+  return Object.keys(customTargets.am).length > 0 || Object.keys(customTargets.tl).length > 0;
+}
+
+function openTargetModal(type, am, tl) {
+  targetModalScope = { type, am, tl };
+  const current = type === 'am' ? getEffectiveTarget(am, null) : getEffectiveTarget(am, tl);
+  document.getElementById('targetModalTitle').textContent = type === 'am' ? `Set Target — ${am}` : `Set Target — ${tl}`;
+  document.getElementById('targetModalSub').textContent = type === 'am'
+    ? 'This target applies to every team under this Account Manager unless a Team Leader has its own override.'
+    : `Team under ${am}. Overrides the Account Manager / default target for this team only.`;
+  document.getElementById('targetValueInput').value = current;
+  document.getElementById('targetModalOverlay').classList.add('open');
+}
+function closeTargetModal() {
+  document.getElementById('targetModalOverlay').classList.remove('open');
+  targetModalScope = null;
+}
+function saveTargetEntry() {
+  if (!targetModalScope) return;
+  const val = Number(document.getElementById('targetValueInput').value);
+  if (isNaN(val) || val < 0 || val > 100) { alert('Please enter a valid target between 0 and 100.'); return; }
+  if (targetModalScope.type === 'am') customTargets.am[targetModalScope.am] = val;
+  else customTargets.tl[tlTargetKey(targetModalScope.am, targetModalScope.tl)] = val;
+  saveCustomTargets();
+  closeTargetModal();
+  applyFilters();
+}
+function clearTargetEntry() {
+  if (!targetModalScope) return;
+  if (targetModalScope.type === 'am') delete customTargets.am[targetModalScope.am];
+  else delete customTargets.tl[tlTargetKey(targetModalScope.am, targetModalScope.tl)];
+  saveCustomTargets();
+  closeTargetModal();
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════
+// ROOT CAUSE TAGGING (manual, per case — supplements the FAQ topic)
+// ═══════════════════════════════════════════
+const ROOT_CAUSE_KEY = 'dsat_root_cause_log';
+const ROOT_CAUSE_OPTIONS = ['Agent Delay', 'System Error', 'Miscommunication', 'Product Issue', 'Policy / Process', 'Training Gap', 'Other'];
+let rootCauseLog = {}; // { caseId: { rootCause, updatedAt } }
+
+function loadRootCauseLog() {
+  try {
+    const raw = localStorage.getItem(ROOT_CAUSE_KEY);
+    rootCauseLog = raw ? JSON.parse(raw) : {};
+  } catch(e) { rootCauseLog = {}; }
+}
+function saveRootCauseLog() {
+  try { localStorage.setItem(ROOT_CAUSE_KEY, JSON.stringify(rootCauseLog)); } catch(e) {}
+}
+function setCaseRootCause(caseId, rootCause) {
+  if (!rootCause) { delete rootCauseLog[caseId]; }
+  else { rootCauseLog[caseId] = { rootCause, updatedAt: new Date().toISOString() }; }
+  saveRootCauseLog();
+  try { renderRootCauseBreakdown(getScopedRecords(currentAM, currentTL, currentAgent).filter(r => r.rate === 1)); } catch(e) {}
+}
+function rootCauseSelectHtml(caseId) {
+  const current = rootCauseLog[caseId] ? rootCauseLog[caseId].rootCause : '';
+  const opts = ['<option value="">🔎 Tag root cause…</option>'].concat(
+    ROOT_CAUSE_OPTIONS.map(o => `<option value="${o}"${o===current?' selected':''}>${o}</option>`)
+  ).join('');
+  return `<select class="rc-select" onchange="setCaseRootCause('${caseId}', this.value)">${opts}</select>`;
+}
+function renderRootCauseBreakdown(dsatCases) {
+  const subEl = document.getElementById('rootCauseSub');
+  const bodyEl = document.getElementById('rootCauseBreakdown');
+  if (!subEl || !bodyEl) return;
+  const tagged = dsatCases.filter(c => rootCauseLog[c.id]);
+  if (!tagged.length) {
+    subEl.textContent = `0 of ${dsatCases.length} DSAT cases tagged with a root cause yet`;
+    bodyEl.innerHTML = '<div class="lb-empty">No cases tagged yet. Open any case (click a chart, FAQ, or the ranking table) and use "🔎 Tag root cause" on a case card.</div>';
+    return;
+  }
+  subEl.textContent = `${tagged.length} of ${dsatCases.length} DSAT cases tagged with a root cause (${(tagged.length/dsatCases.length*100).toFixed(1)}%)`;
+  const counts = {};
+  tagged.forEach(c => { const rc = rootCauseLog[c.id].rootCause; counts[rc] = (counts[rc]||0)+1; });
+  const sorted = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  const maxCount = counts[sorted[0]] || 1;
+  bodyEl.innerHTML = sorted.map(rc => {
+    const pct = (counts[rc]/maxCount*100).toFixed(0);
+    return `<div class="rc-breakdown-item"><span class="rank-lbl">${rc}</span><div class="rank-bar-w" style="width:140px;"><div class="rank-bar-i" style="width:${pct}%; background:linear-gradient(90deg,#7d3fbe,#ba68c8);"></div></div><span class="rank-cnt" style="color:var(--purple);">${counts[rc]}</span></div>`;
+  }).join('');
 }
 
 function openCoachModal(agentName, opts) {
@@ -2418,250 +2785,75 @@ function computeCoachingImpact(entry, relevantRecords) {
   return { status:'no-change', label:`⚠️ No significant improvement (${diff>=0?'+':''}${diff.toFixed(1)}pt)`, beforeStats, afterStats };
 }
 
-let coachFilterMode = 'all'; // 'all' | 'overdue' | 'dueWeek' | 'active' | 'resolved'
-const coachOpenGroups = new Set(); // which agent/topic timelines are expanded, kept across re-renders
-
-function setCoachFilter(mode) {
-  coachFilterMode = mode;
-  document.querySelectorAll('#coachFilterRow [data-coach-filter]').forEach(b => {
-    b.classList.toggle('active', b.dataset.coachFilter === mode);
-  });
-  renderCoachingTracker();
-}
-
-function updateCoachKpis(withImpact) {
-  const overdueCount = withImpact.filter(x => x.impact.status === 'overdue').length;
-  const activeCount = withImpact.filter(x => x.impact.status === 'pending' || x.impact.status === 'overdue').length;
-  const dueWeekCount = withImpact.filter(x => (x.impact.status === 'pending' || x.impact.status === 'overdue') && isDueThisWeek(x.entry.followUpDate)).length;
-
-  const now = new Date();
-  const resolvedThisMonth = withImpact.filter(x => {
-    if (x.impact.status !== 'improved' && x.impact.status !== 'no-change') return false;
-    const d = new Date(x.entry.updatedAt);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const improvedThisMonth = resolvedThisMonth.filter(x => x.impact.status === 'improved');
-  const improveRate = resolvedThisMonth.length ? (improvedThisMonth.length / resolvedThisMonth.length * 100) : 0;
-
-  document.getElementById('coachKpiOverdue').textContent = overdueCount;
-  document.getElementById('coachKpiDueWeek').textContent = dueWeekCount;
-  document.getElementById('coachKpiActive').textContent = activeCount;
-  document.getElementById('coachKpiImproveRate').textContent = resolvedThisMonth.length ? improveRate.toFixed(0) + '%' : '—';
-  document.getElementById('coachKpiImproveSub').textContent = resolvedThisMonth.length
-    ? `${improvedThisMonth.length} of ${resolvedThisMonth.length} resolved this month`
-    : 'No resolved sessions yet this month';
-}
-
-function buildCoachGroupCard(g) {
-  const e0 = g.entry0;
-  const isFaq = e0.scopeType === 'faq';
-  const title = isFaq ? `📋 ${e0.faqTopic}` : e0.agent;
-  const scopeLabel = isFaq
-    ? `Scope: ${e0.scopeTL !== 'ALL' ? e0.scopeTL : (e0.scopeAM !== 'ALL' ? e0.scopeAM : 'Whole Floor')}`
-    : `${e0.tl} · ${e0.am}`;
-  const latestImpact = g.items[0].impact; // most recent session's current status
-
-  const card = document.createElement('div');
-  card.className = 'coach-group-card' + (g.hasOverdue ? ' has-overdue' : '') + (coachOpenGroups.has(g.key) ? ' open' : '');
-
-  const head = document.createElement('div');
-  head.className = 'coach-group-head';
-  head.innerHTML = `
-    <div>
-      <div class="coach-group-title">${title}</div>
-      <div class="coach-group-sub">${scopeLabel}</div>
-    </div>
-    <span class="coach-group-count">${g.items.length} session${g.items.length>1?'s':''}</span>
-    <span class="coach-status ${latestImpact.status}">${latestImpact.label}</span>
-    <button class="coach-group-add" data-add-session>+ New Session</button>
-    <span class="coach-group-chev">▾</span>`;
-  head.addEventListener('click', (e) => {
-    if (e.target.closest('[data-add-session]')) return;
-    const nowOpen = !card.classList.contains('open');
-    card.classList.toggle('open', nowOpen);
-    if (nowOpen) coachOpenGroups.add(g.key); else coachOpenGroups.delete(g.key);
-  });
-  head.querySelector('[data-add-session]').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (isFaq) openCoachModalForFaq(e0.faqTopic, e0.scopeAM, e0.scopeTL);
-    else openCoachModal(e0.agent);
-  });
-  card.appendChild(head);
-
-  const timeline = document.createElement('div');
-  timeline.className = 'coach-timeline';
-  g.items.forEach(({ entry, impact }) => {
-    const noteExtra = isFaq ? '' :
-      (entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : '') +
-      (entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">Case #${entry.caseId}</span>` : '');
-    const item = document.createElement('div');
-    item.className = 'coach-timeline-item ' + impact.status;
-    item.innerHTML = `
-      <div class="coach-timeline-dates">Flagged ${entry.flagDate} · Follow-up ${entry.followUpDate}</div>
-      <div class="coach-note-cell">${entry.note}${noteExtra}</div>
-      <div style="margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span class="coach-status ${impact.status}">${impact.label}</span>
-        <button class="coach-btn" data-edit-entry="${entry.id}">✏️ Edit</button>
-      </div>`;
-    item.querySelector('[data-edit-entry]').addEventListener('click', (e) => { e.stopPropagation(); editCoachEntry(entry.id); });
-    timeline.appendChild(item);
-  });
-  card.appendChild(timeline);
-  return card;
-}
-
 function renderCoachingTracker() {
-  const listEl = document.getElementById('coachGroupList');
+  const tbody = document.getElementById('coachTrackerBody');
+  const wrapEl = document.getElementById('coachTrackerWrap');
   const emptyEl = document.getElementById('coachEmptyMsg');
-  listEl.innerHTML = '';
+  tbody.innerHTML = '';
 
   if (!coachingLog.length) {
-    listEl.style.display = 'none';
+    wrapEl.style.display = 'none';
     emptyEl.style.display = 'block';
-    updateCoachKpis([]);
     return;
   }
+  wrapEl.style.display = 'block';
+  emptyEl.style.display = 'none';
 
   // Group ALL_RECORDS by agent once instead of filtering the whole array per coaching entry
   const byAgent = {};
   ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
 
-  const withImpact = coachingLog.map(entry => ({ entry, impact: computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent)) }));
-  updateCoachKpis(withImpact);
-
-  const filtered = withImpact.filter(({ entry, impact }) => {
-    if (coachFilterMode === 'overdue') return impact.status === 'overdue';
-    if (coachFilterMode === 'dueWeek') return (impact.status === 'pending' || impact.status === 'overdue') && isDueThisWeek(entry.followUpDate);
-    if (coachFilterMode === 'active') return impact.status === 'pending' || impact.status === 'overdue';
-    if (coachFilterMode === 'resolved') return impact.status === 'improved' || impact.status === 'no-change';
-    return true;
-  });
-
-  emptyEl.style.display = 'none';
-  if (!filtered.length) {
-    listEl.style.display = 'block';
-    listEl.innerHTML = '<div class="coach-filter-empty">No follow-ups match this filter.</div>';
-    return;
-  }
-  listEl.style.display = 'flex';
-
-  // Group entries into one "coaching file" per agent (or per FAQ topic + scope), newest session first
-  const groups = {};
-  filtered.forEach(({ entry, impact }) => {
-    const key = getEntryGroupKey(entry);
-    if (!groups[key]) groups[key] = { key, entry0: entry, items: [] };
-    groups[key].items.push({ entry, impact });
-  });
-
+  // Compute impact for every entry up front so we can sort by priority: Overdue first,
+  // then Pending (soonest follow-up date first), then resolved (No-change, then Improved).
   const PRIORITY_RANK = { overdue: 0, pending: 1, 'no-change': 2, improved: 3 };
-  const groupList = Object.values(groups).map(g => {
-    g.items.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt);
-    g.status = g.items.reduce((best, it) => PRIORITY_RANK[it.impact.status] < PRIORITY_RANK[best] ? it.impact.status : best, g.items[0].impact.status);
-    g.hasOverdue = g.items.some(it => it.impact.status === 'overdue');
-    g.latestUpdated = Math.max(...g.items.map(it => it.entry.updatedAt));
-    return g;
+  const withImpact = coachingLog.map(entry => {
+    let impact, relevant;
+    if (entry.scopeType === 'faq') {
+      relevant = ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
+        (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
+        (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
+    } else {
+      relevant = byAgent[entry.agent] || [];
+    }
+    impact = computeCoachingImpact(entry, relevant);
+    return { entry, impact };
   });
 
-  groupList.sort((a, b) => {
-    const rankDiff = PRIORITY_RANK[a.status] - PRIORITY_RANK[b.status];
+  withImpact.sort((a, b) => {
+    const rankDiff = PRIORITY_RANK[a.impact.status] - PRIORITY_RANK[b.impact.status];
     if (rankDiff !== 0) return rankDiff;
-    return b.latestUpdated - a.latestUpdated;
+    if (a.impact.status === 'pending') {
+      // Soonest follow-up date first within the pending group
+      return new Date(a.entry.followUpDate) - new Date(b.entry.followUpDate);
+    }
+    return b.entry.updatedAt - a.entry.updatedAt;
   });
 
   const frag = document.createDocumentFragment();
-  groupList.forEach(g => frag.appendChild(buildCoachGroupCard(g)));
-  listEl.appendChild(frag);
-}
-
-function getCoachingExportRows() {
-  const byAgent = {};
-  ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
-  const rows = [['Target','Type','Team Leader','Account Manager','Note','Category/Topic','Case ID','Flagged','Follow-up','Status']];
-  coachingLog.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(entry => {
-    const impact = computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent));
-    const statusText = impact.label.replace(/[✅⚠️🔴🟡]/g,'').trim();
-    rows.push([
-      entry.scopeType === 'faq' ? entry.faqTopic : entry.agent,
-      entry.scopeType === 'faq' ? 'FAQ Topic' : 'Agent',
-      entry.tl, entry.am, entry.note,
-      entry.scopeType === 'faq' ? '' : (entry.category || ''),
-      entry.caseId || '',
-      entry.flagDate, entry.followUpDate, statusText
-    ]);
+  withImpact.forEach(({ entry, impact }) => {
+    let targetCell, noteCell;
+    if (entry.scopeType === 'faq') {
+      const scopeLabel = entry.scopeTL !== 'ALL' ? entry.scopeTL : (entry.scopeAM !== 'ALL' ? entry.scopeAM : 'Whole Floor');
+      targetCell = `<div class="aname">📋 ${entry.faqTopic}</div><div class="aclean">Scope: ${scopeLabel}</div>`;
+      noteCell = `<div class="coach-note-cell">${entry.note}</div>`;
+    } else {
+      targetCell = `<div class="aname">${entry.agent}</div><div class="aclean">${String(entry.agent).replace('jw_','')}</div>`;
+      noteCell = `<div class="coach-note-cell">${entry.note}${entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : ''}${entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">Case #${entry.caseId}</span>` : ''}</div>`;
+    }
+    const tr = document.createElement('tr');
+    tr.className = 'trow';
+    tr.innerHTML = `
+      <td>${targetCell}</td>
+      <td><span class="tl-chip">${entry.tl}</span></td>
+      <td><span class="am-chip">${entry.am}</span></td>
+      <td>${noteCell}</td>
+      <td style="font-size:11.5px;color:var(--muted);">${entry.flagDate}</td>
+      <td style="font-size:11.5px;color:var(--muted);">${entry.followUpDate}</td>
+      <td><span class="coach-status ${impact.status}">${impact.label}</span></td>
+      <td><button class="coach-btn" onclick="editCoachEntry('${entry.id}')">✏️ Edit</button></td>`;
+    frag.appendChild(tr);
   });
-  return rows;
-}
-
-function exportCoachingTrackerXlsx() {
-  if (!coachingLog.length) { alert('No coaching entries to export yet.'); return; }
-  downloadXlsx(`Coaching_Tracker_${new Date().toISOString().slice(0,10)}.xlsx`, getCoachingExportRows(), 'Coaching Tracker');
-}
-
-function exportCoachingTrackerPdf() {
-  if (!coachingLog.length) { alert('No coaching entries to export yet.'); return; }
-  if (!window.jspdf) { alert('The PDF library is still loading — try again in a moment.'); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'mm', format:'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 14;
-  let y = margin;
-  const now = new Date();
-
-  doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.setTextColor(0,0,0);
-  doc.text('Coaching Tracker Report', margin, y + 4);
-  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(90,90,90);
-  doc.text(`Generated ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`, pageW - margin, y + 4, { align:'right' });
-  y += 10;
-  doc.setDrawColor(251,229,5); doc.setLineWidth(1); doc.line(margin, y, pageW - margin, y); doc.setLineWidth(0.2);
-  y += 8;
-
-  const rows = getCoachingExportRows();
-  const dataRows = rows.slice(1);
-  const cols = [
-    { key:0, label:'Target', w:34 },
-    { key:1, label:'Type', w:18 },
-    { key:2, label:'Team Leader', w:30 },
-    { key:3, label:'AM', w:26 },
-    { key:7, label:'Flagged', w:22 },
-    { key:8, label:'Follow-up', w:22 },
-    { key:9, label:'Status', w:0 }
-  ];
-  const contentW = pageW - margin*2;
-  const fixedW = cols.slice(0,-1).reduce((s,c)=>s+c.w,0);
-  cols[cols.length-1].w = contentW - fixedW;
-
-  function ensureSpace(h) { if (y + h > pageH - margin) { doc.addPage(); y = margin; } }
-
-  ensureSpace(8);
-  let hx = margin;
-  doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont(undefined,'bold');
-  cols.forEach(c => { doc.text(c.label, hx, y); hx += c.w; });
-  y += 4;
-  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW - margin, y);
-  y += 4;
-  doc.setFont(undefined,'normal');
-
-  dataRows.forEach(row => {
-    ensureSpace(6);
-    let rx = margin;
-    doc.setFontSize(7.8); doc.setTextColor(0,0,0);
-    cols.forEach(c => {
-      const val = String(row[c.key] ?? '').slice(0, c.w > 30 ? 40 : Math.floor(c.w*1.6));
-      doc.text(val, rx, y);
-      rx += c.w;
-    });
-    y += 5.5;
-  });
-
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p);
-    doc.setFontSize(7.5); doc.setTextColor(160,160,160);
-    doc.text('Floor DSAT & CSAT Analytics Dashboard — Coaching Tracker', pageW/2, pageH-8, { align:'center' });
-    doc.text(`${p} / ${pageCount}`, pageW - margin, pageH-8, { align:'right' });
-  }
-  doc.save(`Coaching_Tracker_${now.toISOString().slice(0,10)}.pdf`);
+  tbody.appendChild(frag);
 }
 
 // ═══════════════════════════════════════════
@@ -2730,6 +2922,8 @@ async function pushCoachingToRemote(entry, isUpdate) {
 
 (function initCoaching() {
   loadCoachingLog();
+  loadCustomTargets();
+  loadRootCauseLog();
   try {
     const savedUrl = localStorage.getItem(COACHING_SYNC_KEY);
     if (savedUrl) {
@@ -2780,6 +2974,64 @@ function openAgentPanel(agentName, dsatCases) {
   if (row) row.classList.add('active');
   const agentCases = dsatCases.filter(c => c.agent === agentName);
   openPanel({ label: agentName, cases: agentCases, icon:'👤', sub:`${agentCases.length} total DSAT cases assigned to this agent` });
+}
+
+// ═══════════════════════════════════════════
+// AGENT PROFILE — full history in one place
+// ═══════════════════════════════════════════
+function openAgentProfile(agentName) {
+  const records = ALL_RECORDS.filter(r => r.agent === agentName);
+  const rated = records.filter(r => r.rate);
+  const stats = computeRateStats(rated);
+  const dsatCases = rated.filter(r => r.rate === 1).slice().reverse(); // most recent first
+  const am = records[0] ? records[0].am : 'Unassigned';
+  const tl = records[0] ? records[0].tl : 'Unassigned';
+  const effTarget = getEffectiveTarget(am, tl);
+
+  document.getElementById('apAgentName').textContent = agentName;
+  document.getElementById('apAgentSub').textContent = `TL: ${tl} · AM: ${am}`;
+
+  document.getElementById('apStatRow').innerHTML = `
+    <div class="ap-stat"><div class="ap-stat-val" style="color:#ef5350;">${stats.dsatPct.toFixed(1)}%</div><div class="ap-stat-lbl">DSAT %</div></div>
+    <div class="ap-stat"><div class="ap-stat-val" style="color:#66bb6a;">${stats.csatPct.toFixed(1)}%</div><div class="ap-stat-lbl">CSAT % (target ${effTarget}%)</div></div>
+    <div class="ap-stat"><div class="ap-stat-val">${stats.grandTotal}</div><div class="ap-stat-lbl">Total Rated</div></div>
+    <div class="ap-stat"><div class="ap-stat-val" style="color:${stats.counts[1]}">${stats.counts[1]}</div><div class="ap-stat-lbl">DSAT Cases</div></div>`;
+
+  // Performance curve — daily CSAT%/DSAT% for this agent
+  const days = getFullDayRange();
+  const byDay = {};
+  rated.forEach(r => { if (!byDay[r.date]) byDay[r.date] = {1:0,2:0,3:0,4:0,5:0}; byDay[r.date][r.rate]++; });
+  const activeDays = days.filter(d => byDay[d]);
+  const dsatSeries = activeDays.map(d => { const c=byDay[d]; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t?(c[1]/t*100).toFixed(1):0; });
+  const csatSeries = activeDays.map(d => { const c=byDay[d]; const t=c[1]+c[2]+c[3]+c[4]+c[5]; return t?((c[4]+c[5])/t*100).toFixed(1):0; });
+  destroyChart(agentProfileChartInst);
+  agentProfileChartInst = new Chart(document.getElementById('agentProfileChart'), {
+    type: 'line',
+    data: { labels: activeDays, datasets: [
+      { label:'CSAT %', data:csatSeries, borderColor:'#66bb6a', backgroundColor:'rgba(102,187,106,.12)', borderWidth:2, pointRadius:3, tension:.35, fill:true },
+      { label:'DSAT %', data:dsatSeries, borderColor:'#ef5350', backgroundColor:'rgba(239,83,80,.10)', borderWidth:2, pointRadius:3, tension:.35, fill:true }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'top', labels:{font:{size:10}, boxWidth:10}} }, scales:{ x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:gridColor()}, ticks:{font:{size:10}, callback:v=>v+'%'}, min:0, max:100 } } }
+  });
+
+  // Coaching history
+  const coachEntries = coachingLog.filter(e => e.agent === agentName && e.scopeType !== 'faq').sort((a,b) => new Date(b.flagDate||b.createdAt||0) - new Date(a.flagDate||a.createdAt||0));
+  const coachHistEl = document.getElementById('apCoachHistory');
+  coachHistEl.innerHTML = coachEntries.length ? coachEntries.map(e => `
+    <div class="ap-coach-row"><b>${e.flagDate || '—'}</b> — ${e.note ? e.note : '(no note)'}${e.followUpDate ? ` <span style="color:var(--muted);">· follow-up ${e.followUpDate}</span>` : ''}</div>
+  `).join('') : '<div class="lb-empty">No coaching follow-ups logged for this agent yet.</div>';
+
+  // Recent DSAT cases (with root cause tag if present)
+  const caseHistEl = document.getElementById('apCaseHistory');
+  const recentCases = dsatCases.slice(0, 25);
+  caseHistEl.innerHTML = recentCases.length ? recentCases.map(c => `
+    <div class="ap-case-row"><span style="font-family:monospace;color:var(--muted);">#${c.id}</span><span style="flex:1;">${c.faq || '—'}</span><span style="color:var(--muted);">${c.date}</span>${rootCauseLog[c.id] ? `<span class="rc-tag-badge">${rootCauseLog[c.id].rootCause}</span>` : ''}</div>
+  `).join('') : '<div class="lb-empty">No DSAT cases.</div>';
+
+  document.getElementById('agentProfileOverlay').classList.add('open');
+}
+function closeAgentProfile() {
+  document.getElementById('agentProfileOverlay').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════
@@ -2982,9 +3234,15 @@ function closePanel() {
 document.getElementById('panelOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('panelOverlay')) closePanel();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePanel(); closeCoachModal(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePanel(); closeCoachModal(); closeTargetModal(); closeAgentProfile(); } });
 document.getElementById('coachModalOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('coachModalOverlay')) closeCoachModal();
+});
+document.getElementById('targetModalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('targetModalOverlay')) closeTargetModal();
+});
+document.getElementById('agentProfileOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('agentProfileOverlay')) closeAgentProfile();
 });
 
 // ═══════════════════════════════════════════

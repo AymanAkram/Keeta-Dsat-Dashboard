@@ -210,6 +210,43 @@
     .upload-btn:hover { background:rgba(102,187,106,.22); transform:translateY(-1px); }
     .upload-btn:active { transform:translateY(0) scale(.97); }
 
+    /* ═══ SEARCH MORPH + TEXT-BOX BORDER-BEAM (additive — visual/UX only) ═══ */
+    @property --beam-angle { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+
+    /* Case/Agent/FAQ search — input + button feel like one soft, springy pill */
+    .gooey-search-wrap { position:relative; display:flex; align-items:center; gap:8px; padding:3px; border-radius:13px; transition:box-shadow .3s var(--ease), background .3s var(--ease); }
+    .gooey-search-wrap:focus-within { background:var(--surface2); box-shadow:0 0 0 3px var(--ring), 0 6px 18px rgba(20,120,90,.16); }
+    .gooey-search-input.gooey-search-input { transition:min-width .4s cubic-bezier(.34,1.56,.64,1), border-color .15s var(--ease), box-shadow .15s var(--ease); }
+    .gooey-search-wrap:focus-within .gooey-search-input { min-width:270px !important; }
+    .gooey-search-btn { position:relative; display:inline-flex; align-items:center; gap:7px; transition:background .18s var(--ease), transform .15s cubic-bezier(.34,1.56,.64,1); }
+    .gooey-search-btn:active { transform:scale(.93); }
+    .gooey-icon-swap { position:relative; width:13px; height:13px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .gs-icon { position:absolute; inset:0; transition:opacity .3s var(--ease), transform .4s cubic-bezier(.34,1.56,.64,1); }
+    .gs-search-icon { opacity:1; transform:scale(1) rotate(0deg); }
+    .gs-spinner-icon { opacity:0; transform:scale(.4) rotate(-90deg); }
+    .gs-spinner-icon circle { transform-box:fill-box; transform-origin:center; animation:gs-spin .7s linear infinite; }
+    .gooey-search-wrap.is-searching .gs-search-icon { opacity:0; transform:scale(.4) rotate(90deg); }
+    .gooey-search-wrap.is-searching .gs-spinner-icon { opacity:1; transform:scale(1) rotate(0deg); }
+    .gooey-search-wrap.is-searching .gooey-search-btn { background:rgba(39,185,146,.26); }
+    @keyframes gs-spin { to { transform:rotate(360deg); } }
+
+    /* Text boxes — a slow "beam" of brand light chasing the border, quickening on focus */
+    .sheet-input.beam-field,
+    #coachFollowUpInput.beam-field,
+    #targetValueInput.beam-field {
+      border:1.5px solid transparent !important; border-radius:9px;
+      background:
+        linear-gradient(var(--beam-fill, var(--surface)), var(--beam-fill, var(--surface))) padding-box,
+        conic-gradient(from var(--beam-angle), transparent 0deg, transparent 250deg, var(--keeta-green) 295deg, var(--keeta-yellow) 320deg, var(--keeta-green) 345deg, transparent 360deg) border-box;
+      animation:beam-rotate 4.5s linear infinite;
+    }
+    .sheet-input.beam-field:focus,
+    #coachFollowUpInput.beam-field:focus,
+    #targetValueInput.beam-field:focus { animation-duration:1.5s; box-shadow:0 0 0 3px var(--ring); }
+    #coachFollowUpInput.beam-field,
+    #targetValueInput.beam-field { --beam-fill:var(--surface2); }
+    @keyframes beam-rotate { to { --beam-angle:360deg; } }
+
     .drawer-toggle { display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); color:var(--subtext); font-size:11.5px; font-weight:700; padding:8px 14px; border-radius:9px; cursor:pointer; transition:background .18s var(--ease), border-color .18s var(--ease); }
     .drawer-toggle:hover { border-color:var(--keeta-green); }
     .drawer-toggle .chev { display:inline-block; transition:transform .25s var(--ease); color:var(--muted); }
@@ -559,7 +596,7 @@
     </div>
     <div class="coach-field">
       <label>Suggested Follow-up Date</label>
-      <input type="date" id="coachFollowUpInput" />
+      <input type="date" id="coachFollowUpInput" class="beam-field" />
     </div>
     <div class="coach-field" id="coachCategoryField">
       <label>Issue Category (optional)</label>
@@ -598,7 +635,7 @@
     <div class="sub" id="targetModalSub">—</div>
     <div class="coach-field">
       <label>CSAT Target (%)</label>
-      <input type="number" id="targetValueInput" min="0" max="100" step="1" placeholder="e.g. 72" />
+      <input type="number" id="targetValueInput" min="0" max="100" step="1" placeholder="e.g. 72" class="beam-field" />
     </div>
     <div class="coach-modal-actions">
       <button class="coach-delete-btn" id="targetClearBtn" onclick="clearTargetEntry()">↺ Reset to Default</button>
@@ -724,8 +761,16 @@
     <button class="reset-btn" onclick="resetToFloor()">🌐 Show Whole Floor</button>
     <div class="breadcrumb" id="breadcrumb"></div>
     <span style="flex:1"></span>
-    <input type="text" id="caseIdSearch" class="tl-select" placeholder="🔍 Case ID / Agent Name / FAQ Keyword..." style="min-width:220px;" onkeydown="if(event.key==='Enter'){searchCaseId();}" />
-    <button class="reset-btn" onclick="searchCaseId()">Search</button>
+    <div class="gooey-search-wrap" id="gooeySearchWrap">
+      <input type="text" id="caseIdSearch" class="tl-select gooey-search-input" placeholder="🔍 Case ID / Agent Name / FAQ Keyword..." style="min-width:220px;" onkeydown="if(event.key==='Enter'){dashSearchWithAnim();}" />
+      <button class="reset-btn gooey-search-btn" id="gooeySearchBtn" onclick="dashSearchWithAnim()">
+        <span class="gooey-icon-swap" id="gooeySearchIcon">
+          <svg class="gs-icon gs-search-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="20" y1="20" x2="15.5" y2="15.5"></line></svg>
+          <svg class="gs-icon gs-spinner-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="42 100"></circle></svg>
+        </span>
+        <span>Search</span>
+      </button>
+    </div>
   </div>
   <div class="toolbar-row">
     <button class="upload-btn" onclick="exportFullReportPdf()">📄 Export Full Report (PDF)</button>
@@ -739,7 +784,7 @@
   <div class="drawer open" id="syncDrawer">
     <div class="sync-bar">
       <span class="filter-lbl">🔗 Google Sheet Link</span>
-      <input type="text" id="sheetUrlInput" class="sheet-input" placeholder="Paste the Published CSV link from Google Sheets here..." />
+      <input type="text" id="sheetUrlInput" class="sheet-input beam-field" placeholder="Paste the Published CSV link from Google Sheets here..." />
       <button class="upload-btn" onclick="connectSheet()">Connect</button>
       <select id="refreshInterval" class="refresh-select">
         <option value="0">Manual refresh only</option>
@@ -1062,7 +1107,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
       <span class="filter-lbl">🔗 Coaching Sheet Sync (optional)</span>
-      <input type="text" id="coachSyncUrlInput" class="sheet-input" style="flex:1; min-width:200px;" placeholder="SheetDB API link (https://sheetdb.io/api/v1/...)" />
+      <input type="text" id="coachSyncUrlInput" class="sheet-input beam-field" style="flex:1; min-width:200px;" placeholder="SheetDB API link (https://sheetdb.io/api/v1/...)" />
       <button class="upload-btn" onclick="connectCoachingSync()">Connect</button>
       <button class="reset-btn" onclick="pullCoachingFromRemote(true)">🔄 Sync Now</button>
       <span class="file-lbl" id="coachSyncStatus"><span class="sync-dot off"></span>Saved locally only</span>
@@ -3384,6 +3429,17 @@ document.getElementById('refreshInterval').addEventListener('change', setupAutoR
 // ═══════════════════════════════════════════
 // UI ENHANCEMENTS (additive — visual/UX only, no data logic touched)
 // ═══════════════════════════════════════════
+// ── SEARCH: brief morph + spinner before running the real search ──
+function dashSearchWithAnim() {
+  const wrap = document.getElementById('gooeySearchWrap');
+  if (!wrap || wrap.classList.contains('is-searching')) { searchCaseId(); return; }
+  wrap.classList.add('is-searching');
+  setTimeout(() => {
+    searchCaseId();
+    wrap.classList.remove('is-searching');
+  }, 420);
+}
+
 function dashUiToggleSyncDrawer() {
   const drawer = document.getElementById('syncDrawer');
   const btn = document.getElementById('syncDrawerToggle');

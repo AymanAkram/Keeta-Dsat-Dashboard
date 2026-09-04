@@ -464,6 +464,33 @@
     .coach-note-cell { max-width:220px; font-size:11.5px; color:var(--subtext); line-height:1.4; }
     .coach-empty { text-align:center; padding:34px; color:var(--muted); font-size:12.5px; }
 
+    /* COACHING KPI STRIP + FILTERS + GROUPED TIMELINE (agent coaching file) */
+    .kpi-row-4 { grid-template-columns:repeat(4,1fr); }
+    .coach-group-list { display:flex; flex-direction:column; gap:10px; }
+    .coach-group-card { border:1px solid var(--border); border-radius:12px; background:var(--surface2); overflow:hidden; transition:border-color .15s var(--ease); }
+    .coach-group-card.has-overdue { border-color:rgba(239,83,80,.5); }
+    .coach-group-head { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; flex-wrap:wrap; }
+    .coach-group-head:hover { background:var(--surface3); }
+    .coach-group-title { font-size:13px; font-weight:700; color:var(--subtext); }
+    .coach-group-sub { font-size:10.5px; color:var(--muted); margin-top:1px; }
+    .coach-group-count { font-size:10.5px; font-weight:700; color:var(--muted); background:var(--surface); border:1px solid var(--border); padding:2px 8px; border-radius:20px; white-space:nowrap; }
+    .coach-group-chev { margin-left:auto; color:var(--muted); transition:transform .2s var(--ease); flex-shrink:0; }
+    .coach-group-card.open .coach-group-chev { transform:rotate(180deg); }
+    .coach-group-add { background:rgba(39,185,146,.14); border:1px solid rgba(39,185,146,.35); color:var(--keeta-green); font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:7px; cursor:pointer; white-space:nowrap; transition:background .15s var(--ease); }
+    .coach-group-add:hover { background:rgba(39,185,146,.24); }
+    .coach-timeline { display:none; padding:0 14px 14px; border-top:1px solid var(--border); }
+    .coach-group-card.open .coach-timeline { display:block; }
+    .coach-timeline-item { position:relative; padding:12px 0 12px 20px; border-left:2px solid var(--border); margin-left:5px; }
+    .coach-timeline-item:last-child { padding-bottom:2px; }
+    .coach-timeline-item::before { content:''; position:absolute; left:-6px; top:16px; width:10px; height:10px; border-radius:50%; background:var(--surface2); border:2px solid var(--muted); }
+    .coach-timeline-item.pending::before { border-color:var(--yellow); }
+    .coach-timeline-item.overdue::before { border-color:#ef5350; }
+    .coach-timeline-item.improved::before { border-color:var(--keeta-green,#1c8f70); }
+    .coach-timeline-item.no-change::before { border-color:var(--muted); }
+    .coach-timeline-dates { font-size:10.5px; color:var(--muted); margin-bottom:4px; }
+    .coach-filter-empty { text-align:center; padding:24px; color:var(--muted); font-size:12px; }
+    @media(max-width:900px) { .kpi-row-4 { grid-template-columns:repeat(2,1fr); } }
+
     /* COACH MODAL */
     .coach-modal-overlay { display:none; position:fixed; inset:0; background:rgba(10,10,10,.55); z-index:110; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
     .coach-modal-overlay.open { display:flex; }
@@ -913,11 +940,43 @@
         <div class="zone-desc">Flag agents, track follow-ups, and measure improvement</div>
       </div>
     </div>
+  <!-- COACHING KPI STRIP -->
+  <div class="kpi-row kpi-row-4" id="coachKpiRow">
+    <div class="kpi-card red" style="cursor:pointer;" onclick="setCoachFilter('overdue')" title="Show overdue follow-ups">
+      <div class="kpi-icon">🔴</div>
+      <div class="kpi-label">Overdue Follow-ups</div>
+      <div class="kpi-value red" id="coachKpiOverdue">0</div>
+      <div class="kpi-sub">Past follow-up date, still pending</div>
+    </div>
+    <div class="kpi-card orange" style="cursor:pointer;" onclick="setCoachFilter('dueWeek')" title="Show follow-ups due within 7 days">
+      <div class="kpi-icon">🟡</div>
+      <div class="kpi-label">Due This Week</div>
+      <div class="kpi-value orange" id="coachKpiDueWeek">0</div>
+      <div class="kpi-sub">Follow-up date within 7 days</div>
+    </div>
+    <div class="kpi-card blue" style="cursor:pointer;" onclick="setCoachFilter('active')" title="Show all pending/overdue sessions">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-label">Active Flags</div>
+      <div class="kpi-value blue" id="coachKpiActive">0</div>
+      <div class="kpi-sub">Pending or overdue sessions</div>
+    </div>
+    <div class="kpi-card green" style="cursor:pointer;" onclick="setCoachFilter('resolved')" title="Show resolved sessions">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-label">Improvement Rate (This Month)</div>
+      <div class="kpi-value green" id="coachKpiImproveRate">—</div>
+      <div class="kpi-sub" id="coachKpiImproveSub">No resolved sessions yet this month</div>
+    </div>
+  </div>
+
   <div class="card" style="margin-bottom:22px;">
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
       <div>
         <div class="card-t">Coaching & Improvement Tracking</div>
-        <div class="card-s" style="margin-bottom:0;">Flag any agent from the ranking table above, and the dashboard will automatically compare their DSAT rate before and after the flag date</div>
+        <div class="card-s" style="margin-bottom:0;">Every follow-up is grouped into that agent's (or topic's) coaching file as one timeline. Flag any agent from the ranking table above, or an FAQ topic from the FAQ list — the dashboard compares performance before/after the flag date, and tracks the specific topic when a category is set.</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="upload-btn" onclick="exportCoachingTrackerXlsx()">⬇ Extract</button>
+        <button class="upload-btn" onclick="exportCoachingTrackerPdf()">📄 Export PDF</button>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
@@ -927,16 +986,17 @@
       <button class="reset-btn" onclick="pullCoachingFromRemote(true)">🔄 Sync Now</button>
       <span class="file-lbl" id="coachSyncStatus"><span class="sync-dot off"></span>Saved locally only</span>
     </div>
-    <div class="tbl-wrap" id="coachTrackerWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Agent</th><th>Team Leader</th><th>AM</th><th>Note</th><th>Flagged</th><th>Follow-up</th><th>Status / Impact</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="coachTrackerBody"></tbody>
-      </table>
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <span class="filter-lbl">Filter</span>
+      <div class="view-mode-row" id="coachFilterRow">
+        <button class="vm-btn active" data-coach-filter="all" onclick="setCoachFilter('all')">All</button>
+        <button class="vm-btn" data-coach-filter="overdue" onclick="setCoachFilter('overdue')">🔴 Overdue</button>
+        <button class="vm-btn" data-coach-filter="dueWeek" onclick="setCoachFilter('dueWeek')">🟡 Due This Week</button>
+        <button class="vm-btn" data-coach-filter="active" onclick="setCoachFilter('active')">📋 Active</button>
+        <button class="vm-btn" data-coach-filter="resolved" onclick="setCoachFilter('resolved')">✅ Resolved</button>
+      </div>
     </div>
+    <div id="coachGroupList" class="coach-group-list"></div>
     <div class="coach-empty" id="coachEmptyMsg" style="display:none;">No follow-ups flagged yet. Click the "🎯" button next to any agent in the ranking table above to get started.</div>
   </div>
   </div>
@@ -963,10 +1023,39 @@ function getAgentsWithActiveCoaching() {
   const activeSet = new Set();
   coachingLog.forEach(entry => {
     if (entry.scopeType === 'faq') return; // suggestion badge only applies to agent-level coaching
-    const impact = computeCoachingImpact(entry, byAgent[entry.agent] || []);
+    const impact = computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent));
     if (impact.status === 'pending' || impact.status === 'overdue') activeSet.add(entry.agent);
   });
   return activeSet;
+}
+
+// Records used to measure a coaching entry's before/after impact. For an agent-level flag
+// that was tagged with a specific FAQ category, we track improvement on THAT topic for the
+// agent (not their overall DSAT) — this is what the coach actually followed up on.
+function getRelevantRecordsForEntry(entry, byAgent) {
+  if (entry.scopeType === 'faq') {
+    return ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
+      (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
+      (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
+  }
+  let recs = (byAgent && byAgent[entry.agent]) || [];
+  if (entry.category) recs = recs.filter(r => r.faq === entry.category);
+  return recs;
+}
+
+function isDueThisWeek(followUpDate) {
+  if (!followUpDate) return false;
+  const now = new Date();
+  const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const in7 = new Date(todayMid); in7.setDate(in7.getDate() + 7);
+  const fu = new Date(followUpDate + 'T00:00:00');
+  return fu >= todayMid && fu <= in7;
+}
+
+function getEntryGroupKey(entry) {
+  return entry.scopeType === 'faq'
+    ? `faq:${entry.faqTopic}:${entry.scopeAM}:${entry.scopeTL}`
+    : `agent:${entry.agent}`;
 }
 
 
@@ -2329,75 +2418,250 @@ function computeCoachingImpact(entry, relevantRecords) {
   return { status:'no-change', label:`⚠️ No significant improvement (${diff>=0?'+':''}${diff.toFixed(1)}pt)`, beforeStats, afterStats };
 }
 
+let coachFilterMode = 'all'; // 'all' | 'overdue' | 'dueWeek' | 'active' | 'resolved'
+const coachOpenGroups = new Set(); // which agent/topic timelines are expanded, kept across re-renders
+
+function setCoachFilter(mode) {
+  coachFilterMode = mode;
+  document.querySelectorAll('#coachFilterRow [data-coach-filter]').forEach(b => {
+    b.classList.toggle('active', b.dataset.coachFilter === mode);
+  });
+  renderCoachingTracker();
+}
+
+function updateCoachKpis(withImpact) {
+  const overdueCount = withImpact.filter(x => x.impact.status === 'overdue').length;
+  const activeCount = withImpact.filter(x => x.impact.status === 'pending' || x.impact.status === 'overdue').length;
+  const dueWeekCount = withImpact.filter(x => (x.impact.status === 'pending' || x.impact.status === 'overdue') && isDueThisWeek(x.entry.followUpDate)).length;
+
+  const now = new Date();
+  const resolvedThisMonth = withImpact.filter(x => {
+    if (x.impact.status !== 'improved' && x.impact.status !== 'no-change') return false;
+    const d = new Date(x.entry.updatedAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const improvedThisMonth = resolvedThisMonth.filter(x => x.impact.status === 'improved');
+  const improveRate = resolvedThisMonth.length ? (improvedThisMonth.length / resolvedThisMonth.length * 100) : 0;
+
+  document.getElementById('coachKpiOverdue').textContent = overdueCount;
+  document.getElementById('coachKpiDueWeek').textContent = dueWeekCount;
+  document.getElementById('coachKpiActive').textContent = activeCount;
+  document.getElementById('coachKpiImproveRate').textContent = resolvedThisMonth.length ? improveRate.toFixed(0) + '%' : '—';
+  document.getElementById('coachKpiImproveSub').textContent = resolvedThisMonth.length
+    ? `${improvedThisMonth.length} of ${resolvedThisMonth.length} resolved this month`
+    : 'No resolved sessions yet this month';
+}
+
+function buildCoachGroupCard(g) {
+  const e0 = g.entry0;
+  const isFaq = e0.scopeType === 'faq';
+  const title = isFaq ? `📋 ${e0.faqTopic}` : e0.agent;
+  const scopeLabel = isFaq
+    ? `Scope: ${e0.scopeTL !== 'ALL' ? e0.scopeTL : (e0.scopeAM !== 'ALL' ? e0.scopeAM : 'Whole Floor')}`
+    : `${e0.tl} · ${e0.am}`;
+  const latestImpact = g.items[0].impact; // most recent session's current status
+
+  const card = document.createElement('div');
+  card.className = 'coach-group-card' + (g.hasOverdue ? ' has-overdue' : '') + (coachOpenGroups.has(g.key) ? ' open' : '');
+
+  const head = document.createElement('div');
+  head.className = 'coach-group-head';
+  head.innerHTML = `
+    <div>
+      <div class="coach-group-title">${title}</div>
+      <div class="coach-group-sub">${scopeLabel}</div>
+    </div>
+    <span class="coach-group-count">${g.items.length} session${g.items.length>1?'s':''}</span>
+    <span class="coach-status ${latestImpact.status}">${latestImpact.label}</span>
+    <button class="coach-group-add" data-add-session>+ New Session</button>
+    <span class="coach-group-chev">▾</span>`;
+  head.addEventListener('click', (e) => {
+    if (e.target.closest('[data-add-session]')) return;
+    const nowOpen = !card.classList.contains('open');
+    card.classList.toggle('open', nowOpen);
+    if (nowOpen) coachOpenGroups.add(g.key); else coachOpenGroups.delete(g.key);
+  });
+  head.querySelector('[data-add-session]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isFaq) openCoachModalForFaq(e0.faqTopic, e0.scopeAM, e0.scopeTL);
+    else openCoachModal(e0.agent);
+  });
+  card.appendChild(head);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'coach-timeline';
+  g.items.forEach(({ entry, impact }) => {
+    const noteExtra = isFaq ? '' :
+      (entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : '') +
+      (entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">Case #${entry.caseId}</span>` : '');
+    const item = document.createElement('div');
+    item.className = 'coach-timeline-item ' + impact.status;
+    item.innerHTML = `
+      <div class="coach-timeline-dates">Flagged ${entry.flagDate} · Follow-up ${entry.followUpDate}</div>
+      <div class="coach-note-cell">${entry.note}${noteExtra}</div>
+      <div style="margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="coach-status ${impact.status}">${impact.label}</span>
+        <button class="coach-btn" data-edit-entry="${entry.id}">✏️ Edit</button>
+      </div>`;
+    item.querySelector('[data-edit-entry]').addEventListener('click', (e) => { e.stopPropagation(); editCoachEntry(entry.id); });
+    timeline.appendChild(item);
+  });
+  card.appendChild(timeline);
+  return card;
+}
+
 function renderCoachingTracker() {
-  const tbody = document.getElementById('coachTrackerBody');
-  const wrapEl = document.getElementById('coachTrackerWrap');
+  const listEl = document.getElementById('coachGroupList');
   const emptyEl = document.getElementById('coachEmptyMsg');
-  tbody.innerHTML = '';
+  listEl.innerHTML = '';
 
   if (!coachingLog.length) {
-    wrapEl.style.display = 'none';
+    listEl.style.display = 'none';
     emptyEl.style.display = 'block';
+    updateCoachKpis([]);
     return;
   }
-  wrapEl.style.display = 'block';
-  emptyEl.style.display = 'none';
 
   // Group ALL_RECORDS by agent once instead of filtering the whole array per coaching entry
   const byAgent = {};
   ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
 
-  // Compute impact for every entry up front so we can sort by priority: Overdue first,
-  // then Pending (soonest follow-up date first), then resolved (No-change, then Improved).
-  const PRIORITY_RANK = { overdue: 0, pending: 1, 'no-change': 2, improved: 3 };
-  const withImpact = coachingLog.map(entry => {
-    let impact, relevant;
-    if (entry.scopeType === 'faq') {
-      relevant = ALL_RECORDS.filter(r => r.rate && r.faq === entry.faqTopic &&
-        (entry.scopeAM === 'ALL' || r.am === entry.scopeAM) &&
-        (entry.scopeTL === 'ALL' || r.tl === entry.scopeTL));
-    } else {
-      relevant = byAgent[entry.agent] || [];
-    }
-    impact = computeCoachingImpact(entry, relevant);
-    return { entry, impact };
+  const withImpact = coachingLog.map(entry => ({ entry, impact: computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent)) }));
+  updateCoachKpis(withImpact);
+
+  const filtered = withImpact.filter(({ entry, impact }) => {
+    if (coachFilterMode === 'overdue') return impact.status === 'overdue';
+    if (coachFilterMode === 'dueWeek') return (impact.status === 'pending' || impact.status === 'overdue') && isDueThisWeek(entry.followUpDate);
+    if (coachFilterMode === 'active') return impact.status === 'pending' || impact.status === 'overdue';
+    if (coachFilterMode === 'resolved') return impact.status === 'improved' || impact.status === 'no-change';
+    return true;
   });
 
-  withImpact.sort((a, b) => {
-    const rankDiff = PRIORITY_RANK[a.impact.status] - PRIORITY_RANK[b.impact.status];
+  emptyEl.style.display = 'none';
+  if (!filtered.length) {
+    listEl.style.display = 'block';
+    listEl.innerHTML = '<div class="coach-filter-empty">No follow-ups match this filter.</div>';
+    return;
+  }
+  listEl.style.display = 'flex';
+
+  // Group entries into one "coaching file" per agent (or per FAQ topic + scope), newest session first
+  const groups = {};
+  filtered.forEach(({ entry, impact }) => {
+    const key = getEntryGroupKey(entry);
+    if (!groups[key]) groups[key] = { key, entry0: entry, items: [] };
+    groups[key].items.push({ entry, impact });
+  });
+
+  const PRIORITY_RANK = { overdue: 0, pending: 1, 'no-change': 2, improved: 3 };
+  const groupList = Object.values(groups).map(g => {
+    g.items.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt);
+    g.status = g.items.reduce((best, it) => PRIORITY_RANK[it.impact.status] < PRIORITY_RANK[best] ? it.impact.status : best, g.items[0].impact.status);
+    g.hasOverdue = g.items.some(it => it.impact.status === 'overdue');
+    g.latestUpdated = Math.max(...g.items.map(it => it.entry.updatedAt));
+    return g;
+  });
+
+  groupList.sort((a, b) => {
+    const rankDiff = PRIORITY_RANK[a.status] - PRIORITY_RANK[b.status];
     if (rankDiff !== 0) return rankDiff;
-    if (a.impact.status === 'pending') {
-      // Soonest follow-up date first within the pending group
-      return new Date(a.entry.followUpDate) - new Date(b.entry.followUpDate);
-    }
-    return b.entry.updatedAt - a.entry.updatedAt;
+    return b.latestUpdated - a.latestUpdated;
   });
 
   const frag = document.createDocumentFragment();
-  withImpact.forEach(({ entry, impact }) => {
-    let targetCell, noteCell;
-    if (entry.scopeType === 'faq') {
-      const scopeLabel = entry.scopeTL !== 'ALL' ? entry.scopeTL : (entry.scopeAM !== 'ALL' ? entry.scopeAM : 'Whole Floor');
-      targetCell = `<div class="aname">📋 ${entry.faqTopic}</div><div class="aclean">Scope: ${scopeLabel}</div>`;
-      noteCell = `<div class="coach-note-cell">${entry.note}</div>`;
-    } else {
-      targetCell = `<div class="aname">${entry.agent}</div><div class="aclean">${String(entry.agent).replace('jw_','')}</div>`;
-      noteCell = `<div class="coach-note-cell">${entry.note}${entry.category ? `<br><span class="chip" style="margin-top:4px;">${entry.category}</span>` : ''}${entry.caseId ? `<br><span class="chip" style="margin-top:4px;background:rgba(255,213,79,.15);color:#b8860b;">Case #${entry.caseId}</span>` : ''}</div>`;
-    }
-    const tr = document.createElement('tr');
-    tr.className = 'trow';
-    tr.innerHTML = `
-      <td>${targetCell}</td>
-      <td><span class="tl-chip">${entry.tl}</span></td>
-      <td><span class="am-chip">${entry.am}</span></td>
-      <td>${noteCell}</td>
-      <td style="font-size:11.5px;color:var(--muted);">${entry.flagDate}</td>
-      <td style="font-size:11.5px;color:var(--muted);">${entry.followUpDate}</td>
-      <td><span class="coach-status ${impact.status}">${impact.label}</span></td>
-      <td><button class="coach-btn" onclick="editCoachEntry('${entry.id}')">✏️ Edit</button></td>`;
-    frag.appendChild(tr);
+  groupList.forEach(g => frag.appendChild(buildCoachGroupCard(g)));
+  listEl.appendChild(frag);
+}
+
+function getCoachingExportRows() {
+  const byAgent = {};
+  ALL_RECORDS.forEach(r => { if (r.rate) (byAgent[r.agent] = byAgent[r.agent] || []).push(r); });
+  const rows = [['Target','Type','Team Leader','Account Manager','Note','Category/Topic','Case ID','Flagged','Follow-up','Status']];
+  coachingLog.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(entry => {
+    const impact = computeCoachingImpact(entry, getRelevantRecordsForEntry(entry, byAgent));
+    const statusText = impact.label.replace(/[✅⚠️🔴🟡]/g,'').trim();
+    rows.push([
+      entry.scopeType === 'faq' ? entry.faqTopic : entry.agent,
+      entry.scopeType === 'faq' ? 'FAQ Topic' : 'Agent',
+      entry.tl, entry.am, entry.note,
+      entry.scopeType === 'faq' ? '' : (entry.category || ''),
+      entry.caseId || '',
+      entry.flagDate, entry.followUpDate, statusText
+    ]);
   });
-  tbody.appendChild(frag);
+  return rows;
+}
+
+function exportCoachingTrackerXlsx() {
+  if (!coachingLog.length) { alert('No coaching entries to export yet.'); return; }
+  downloadXlsx(`Coaching_Tracker_${new Date().toISOString().slice(0,10)}.xlsx`, getCoachingExportRows(), 'Coaching Tracker');
+}
+
+function exportCoachingTrackerPdf() {
+  if (!coachingLog.length) { alert('No coaching entries to export yet.'); return; }
+  if (!window.jspdf) { alert('The PDF library is still loading — try again in a moment.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  let y = margin;
+  const now = new Date();
+
+  doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.setTextColor(0,0,0);
+  doc.text('Coaching Tracker Report', margin, y + 4);
+  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(90,90,90);
+  doc.text(`Generated ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`, pageW - margin, y + 4, { align:'right' });
+  y += 10;
+  doc.setDrawColor(251,229,5); doc.setLineWidth(1); doc.line(margin, y, pageW - margin, y); doc.setLineWidth(0.2);
+  y += 8;
+
+  const rows = getCoachingExportRows();
+  const dataRows = rows.slice(1);
+  const cols = [
+    { key:0, label:'Target', w:34 },
+    { key:1, label:'Type', w:18 },
+    { key:2, label:'Team Leader', w:30 },
+    { key:3, label:'AM', w:26 },
+    { key:7, label:'Flagged', w:22 },
+    { key:8, label:'Follow-up', w:22 },
+    { key:9, label:'Status', w:0 }
+  ];
+  const contentW = pageW - margin*2;
+  const fixedW = cols.slice(0,-1).reduce((s,c)=>s+c.w,0);
+  cols[cols.length-1].w = contentW - fixedW;
+
+  function ensureSpace(h) { if (y + h > pageH - margin) { doc.addPage(); y = margin; } }
+
+  ensureSpace(8);
+  let hx = margin;
+  doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont(undefined,'bold');
+  cols.forEach(c => { doc.text(c.label, hx, y); hx += c.w; });
+  y += 4;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW - margin, y);
+  y += 4;
+  doc.setFont(undefined,'normal');
+
+  dataRows.forEach(row => {
+    ensureSpace(6);
+    let rx = margin;
+    doc.setFontSize(7.8); doc.setTextColor(0,0,0);
+    cols.forEach(c => {
+      const val = String(row[c.key] ?? '').slice(0, c.w > 30 ? 40 : Math.floor(c.w*1.6));
+      doc.text(val, rx, y);
+      rx += c.w;
+    });
+    y += 5.5;
+  });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7.5); doc.setTextColor(160,160,160);
+    doc.text('Floor DSAT & CSAT Analytics Dashboard — Coaching Tracker', pageW/2, pageH-8, { align:'center' });
+    doc.text(`${p} / ${pageCount}`, pageW - margin, pageH-8, { align:'right' });
+  }
+  doc.save(`Coaching_Tracker_${now.toISOString().slice(0,10)}.pdf`);
 }
 
 // ═══════════════════════════════════════════

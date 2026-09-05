@@ -2935,7 +2935,8 @@ function renderCoachingTracker() {
 // so every mutation goes through POST with an "action" field in the JSON body.
 // Three logical sheets on the one endpoint: coaching / rootcause / config.
 // ═══════════════════════════════════════════
-const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxT1eoUBymnB08KW1VpBns27PAUVrZ8_dU9nAcMgDy8AbOoQYowcv48lIcZURF8t-aR/exec';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwkargvjRBTtYdr2VNJ2i8PwAobCvNVD0W2JJ1D54pBBXZ4G29baOiMM7Pnrx3NXMMy/exec';
+const DEFAULT_DATA_SOURCE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRO9PEIjzdx0vqOFchnmK5jaTTIccHyJEg6Y7WGrThQr6JgVBBPEMzUEBvqWRlXOAuORSG31VVSRqD1/pub?output=csv';
 
 async function callSyncApi(action, sheet, payload) {
   if (!coachingSyncUrl) return null;
@@ -3428,10 +3429,10 @@ function applyNewRecords(records, sourceLabel) {
 try {
   const savedUrl = localStorage.getItem('dsat_sheet_url');
   const savedInterval = localStorage.getItem('dsat_refresh_interval');
-  if (savedUrl) {
-    document.getElementById('sheetUrlInput').value = savedUrl;
-    if (savedInterval) document.getElementById('refreshInterval').value = savedInterval;
-  }
+  const initSheetUrl = savedUrl || DEFAULT_DATA_SOURCE_URL;
+  document.getElementById('sheetUrlInput').value = initSheetUrl;
+  if (!savedUrl) { localStorage.setItem('dsat_sheet_url', initSheetUrl); pushDataSourceConfig(initSheetUrl); }
+  if (savedInterval) document.getElementById('refreshInterval').value = savedInterval;
 } catch(e) {}
 
 function toCsvExportUrl(url) {

@@ -2929,10 +2929,41 @@ function renderCoachingTracker() {
 }
 
 // ═══════════════════════════════════════════
-// COACHING + ROOT CAUSE SYNC (Google Apps Script Web App, SheetDB-style API)
-// One endpoint, two logical "sheets": ?sheet=coaching and ?sheet=rootcause
+// COACHING + ROOT CAUSE + DATA-SOURCE SYNC (Google Apps Script Web App)
+// IMPORTANT: Apps Script exec endpoints only dispatch doGet/doPost — real HTTP
+// PATCH/DELETE requests trigger a CORS preflight that Apps Script cannot answer,
+// so every mutation goes through POST with an "action" field in the JSON body.
+// Three logical sheets on the one endpoint: coaching / rootcause / config.
 // ═══════════════════════════════════════════
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxT1eoUBymnB08KW1VpBns27PAUVrZ8_dU9nAcMgDy8AbOoQYowcv48lIcZURF8t-aR/exec';
+
+async function callSyncApi(action, sheet, payload) {
+  if (!coachingSyncUrl) return null;
+  try {
+    const res = await fetch(coachingSyncUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // "simple request" — no CORS preflight
+      body: JSON.stringify(Object.assign({ action, sheet }, payload))
+    });
+    return await res.json().catch(() => null);
+  } catch(e) {
+    console.warn(`Sync API call failed (${action}/${sheet})`, e);
+    return null;
+  }
+}
+
+async function readSyncSheet(sheet) {
+  if (!coachingSyncUrl) return [];
+  try {
+    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'sheet=' + sheet + '&cachebust=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const remote = await res.json();
+    return Array.isArray(remote) ? remote : (Array.isArray(remote.data) ? remote.data : []);
+  } catch(e) {
+    console.warn(`Sync read failed (${sheet})`, e);
+    return null; // null = failed, [] = succeeded but empty
+  }
+}
 
 function connectCoachingSync() {
   const url = document.getElementById('coachSyncUrlInput').value.trim();
@@ -2942,10 +2973,11 @@ function connectCoachingSync() {
   syncNow(true);
 }
 
-// Pulls both the coaching log and the root-cause tags from the remote sheet.
+// Pulls the coaching log, root-cause tags, and the shared data-source link from the remote sheet.
 function syncNow(isManual) {
   pullCoachingFromRemote(isManual);
   pullRootCauseFromRemote(isManual);
+  pullDataSourceConfig(isManual);
 }
 
 async function pullCoachingFromRemote(isManual) {
@@ -2955,16 +2987,13 @@ async function pullCoachingFromRemote(isManual) {
     coachingSyncUrl = url;
   }
   const statusEl = document.getElementById('coachSyncStatus');
-  try {
-    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'sheet=coaching&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const remote = await res.json();
-    mergeCoachingEntries(Array.isArray(remote) ? remote : (Array.isArray(remote.data) ? remote.data : []));
-    if (statusEl) statusEl.innerHTML = `<span class="sync-dot live"></span>Synced — last sync ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
-  } catch(e) {
+  const rows = await readSyncSheet('coaching');
+  if (rows === null) {
     if (statusEl) statusEl.innerHTML = `<span class="sync-dot off"></span>Sync failed — running locally only`;
-    console.warn('Coaching sync pull failed', e);
+    return;
   }
+  mergeCoachingEntries(rows);
+  if (statusEl) statusEl.innerHTML = `<span class="sync-dot live"></span>Synced — last sync ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
 }
 
 function mergeCoachingEntries(remoteEntries) {
@@ -2972,7 +3001,9 @@ function mergeCoachingEntries(remoteEntries) {
   coachingLog.forEach(e => byId[e.id] = e);
   remoteEntries.forEach(re => {
     const local = byId[re.id];
-    if (!local || Number(re.updatedAt) > Number(local.updatedAt)) byId[re.id] = re;
+    const remoteTime = new Date(re.updatedAt || 0).getTime() || Number(re.updatedAt) || 0;
+    const localTime = local ? (new Date(local.updatedAt || 0).getTime() || Number(local.updatedAt) || 0) : -1;
+    if (!local || remoteTime >= localTime) byId[re.id] = re;
   });
   coachingLog = Object.values(byId);
   saveCoachingLog();
@@ -2981,74 +3012,58 @@ function mergeCoachingEntries(remoteEntries) {
 }
 
 async function pushCoachingToRemote(entry, isUpdate) {
-  if (!coachingSyncUrl) return;
-  const base = coachingSyncUrl.replace(/\/$/, '');
-  try {
-    if (isUpdate) {
-      // Try to UPDATE the existing row first (SheetDB-style: PATCH /id/{value})
-      const res = await fetch(`${base}/id/${encodeURIComponent(entry.id)}?sheet=coaching`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // plain text avoids a CORS preflight against Apps Script
-        body: JSON.stringify({ data: entry })
-      });
-      const result = await res.json().catch(()=>({}));
-      // If nothing matched to update (row not there yet), fall back to creating it
-      if (result && (result.updated === 0 || result.updated === undefined)) {
-        await fetch(`${base}?sheet=coaching`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
-      }
-    } else {
-      await fetch(`${base}?sheet=coaching`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
-    }
-  } catch(e) { console.warn('Coaching sync push failed', e); }
+  await callSyncApi('upsert', 'coaching', { data: entry });
 }
 
 async function pushCoachingDeleteRemote(id) {
-  if (!coachingSyncUrl || !id) return;
-  const base = coachingSyncUrl.replace(/\/$/, '');
-  try {
-    await fetch(`${base}/id/${encodeURIComponent(id)}?sheet=coaching`, { method: 'DELETE' });
-  } catch(e) { console.warn('Coaching sync delete failed', e); }
+  if (!id) return;
+  await callSyncApi('delete', 'coaching', { id });
 }
 
 // --- Root cause tags share the same backend, stored as their own "sheet" keyed by case id ---
 async function pullRootCauseFromRemote(isManual) {
-  if (!coachingSyncUrl) return;
-  try {
-    const res = await fetch(coachingSyncUrl + (coachingSyncUrl.includes('?') ? '&' : '?') + 'sheet=rootcause&cachebust=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const remote = await res.json();
-    const rows = Array.isArray(remote) ? remote : (Array.isArray(remote.data) ? remote.data : []);
-    rows.forEach(row => {
-      if (!row || !row.id) return;
-      const local = rootCauseLog[row.id];
-      const remoteTime = row.updatedAt ? new Date(row.updatedAt).getTime() : 0;
-      const localTime = local ? new Date(local.updatedAt).getTime() : 0;
-      if (row.rootCause && remoteTime >= localTime) {
-        rootCauseLog[row.id] = { rootCause: row.rootCause, updatedAt: row.updatedAt || new Date().toISOString() };
-      }
-    });
-    saveRootCauseLog();
-    if (ALL_RECORDS.length) applyFilters();
-  } catch(e) {
-    if (isManual) console.warn('Root cause sync pull failed', e);
-  }
+  const rows = await readSyncSheet('rootcause');
+  if (rows === null) return;
+  rows.forEach(row => {
+    if (!row || !row.id) return;
+    const local = rootCauseLog[row.id];
+    const remoteTime = row.updatedAt ? new Date(row.updatedAt).getTime() : 0;
+    const localTime = local ? new Date(local.updatedAt).getTime() : 0;
+    if (row.rootCause && remoteTime >= localTime) {
+      rootCauseLog[row.id] = { rootCause: row.rootCause, updatedAt: row.updatedAt || new Date().toISOString() };
+    } else if (!row.rootCause && local && remoteTime >= localTime) {
+      delete rootCauseLog[row.id];
+    }
+  });
+  saveRootCauseLog();
+  if (ALL_RECORDS.length) applyFilters();
 }
 
 async function pushRootCauseToRemote(caseId, rootCause) {
-  if (!coachingSyncUrl || !caseId) return;
-  const base = coachingSyncUrl.replace(/\/$/, '');
+  if (!caseId) return;
   const entry = { id: caseId, caseId, rootCause: rootCause || '', updatedAt: new Date().toISOString() };
-  try {
-    const res = await fetch(`${base}/id/${encodeURIComponent(caseId)}?sheet=rootcause`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ data: entry })
-    });
-    const result = await res.json().catch(()=>({}));
-    if (result && (result.updated === 0 || result.updated === undefined)) {
-      await fetch(`${base}?sheet=rootcause`, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ data: [entry] }) });
-    }
-  } catch(e) { console.warn('Root cause sync push failed', e); }
+  await callSyncApi('upsert', 'rootcause', { data: entry });
+}
+
+// --- Data-source (Google Sheet CSV link) config — so opening the dashboard on any
+// device/browser automatically reconnects to the same source, not just on the PC that set it. ---
+async function pullDataSourceConfig(isManual) {
+  const rows = await readSyncSheet('config');
+  if (!rows || !rows.length) return;
+  const row = rows.find(r => r.id === 'dataSourceUrl');
+  if (!row || !row.value) return;
+  const localUrl = (() => { try { return localStorage.getItem('dsat_sheet_url'); } catch(e) { return null; } })();
+  if (row.value === localUrl && ALL_RECORDS.length) return; // already on this source
+  document.getElementById('sheetUrlInput').value = row.value;
+  try { localStorage.setItem('dsat_sheet_url', row.value); } catch(e) {}
+  sheetUrl = row.value;
+  fetchAndApplySheet(row.value, false);
+  setupAutoRefresh();
+}
+
+async function pushDataSourceConfig(url) {
+  if (!url) return;
+  await callSyncApi('upsert', 'config', { data: { id: 'dataSourceUrl', value: url, updatedAt: new Date().toISOString() } });
 }
 
 (function initCoaching() {
@@ -3065,6 +3080,7 @@ async function pushRootCauseToRemote(caseId, rootCause) {
   renderCoachingTracker();
   if (coachingSyncUrl) syncNow(false);
 })();
+
 
 function searchCaseId() {
   const input = document.getElementById('caseIdSearch');
@@ -3478,6 +3494,7 @@ function connectSheet() {
   }
   sheetUrl = url;
   try { localStorage.setItem('dsat_sheet_url', url); } catch(e) {}
+  pushDataSourceConfig(url); // so any other device/browser picks up the same source automatically
   fetchAndApplySheet(url, true);
   setupAutoRefresh();
 }

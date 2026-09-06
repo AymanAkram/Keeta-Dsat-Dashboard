@@ -753,6 +753,8 @@
     <div class="date" id="hdrPeriod">Report Period: MTD</div>
     <div class="view-mode-row">
       <button class="vm-btn active" id="vmMtdBtn" onclick="setViewMode('mtd')">MTD</button>
+      <button class="vm-btn" id="vmMonthlyBtn" onclick="setViewMode('monthly')">Monthly</button>
+      <select class="tl-select vm-day-select" id="monthSelect" style="display:none;" onchange="onMonthChange(this.value)"></select>
       <button class="vm-btn" id="vmDailyBtn" onclick="setViewMode('daily')">Daily (DPR)</button>
       <select class="tl-select vm-day-select" id="dprDaySelect" style="display:none;" onchange="onDprDayChange(this.value)"></select>
     </div>
@@ -901,6 +903,13 @@
     </div>
   </div>
 
+  <!-- AUTO-GENERATED EXECUTIVE SUMMARY -->
+  <div class="card auto-summary-card" style="margin-bottom:22px;">
+    <div class="card-t">🧠 Auto Summary</div>
+    <div class="card-s" style="margin-bottom:12px;">Generated from this week's numbers vs last week, for the current selection above</div>
+    <div id="autoSummaryText">—</div>
+  </div>
+
   <!-- TREND CHART -->
   <div id="trendSectionWrap">
   <div class="sec">📈 Daily DSAT Trend</div>
@@ -940,6 +949,16 @@
     <div class="card-t">This Week vs Last Week</div>
     <div class="card-s" id="weekCompareSub">—</div>
     <div id="weekCompareBody"></div>
+  </div>
+  </div>
+
+  <!-- MONTH-OVER-MONTH COMPARISON -->
+  <div id="monthComparisonWrap">
+  <div class="sec">📆 Month-over-Month</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-t">This Month vs Last Month</div>
+    <div class="card-s" id="monthCompareSub">—</div>
+    <div id="monthCompareBody"></div>
   </div>
   </div>
   </div>
@@ -1170,6 +1189,7 @@ function computeHitsToAchieve(csatCount, grandTotal, targetPct) {
 let currentAM = 'ALL';
 let viewMode = 'mtd'; // 'mtd' | 'daily'
 let selectedDprDay = null;
+let selectedMonth = null; // month index (0-11) for Monthly view mode
 let currentTL = 'ALL';
 let currentAgent = 'ALL';
 let trendChart, faqBarChartInst, faqDonutInst, agentBarChartInst, tlBarChartInst, amBarChartInst, pctTrendChartInst, agentProfileChartInst;
@@ -1308,10 +1328,21 @@ function groupCount(arr, key) {
 }
 function destroyChart(inst) { if (inst) inst.destroy(); }
 
+function recordMonthIndex(r) {
+  const parts = String(r.date).split('/');
+  return parts.length > 1 ? Number(parts[1]) - 1 : -1;
+}
+
+function getBaseScopedRecords(am, tl, agent) {
+  return ALL_RECORDS.filter(r => (am === 'ALL' || r.am === am) && (tl === 'ALL' || r.tl === tl) && (agent === 'ALL' || r.agent === agent));
+}
+
 function getScopedRecords(am, tl, agent) {
-  let records = ALL_RECORDS.filter(r => (am === 'ALL' || r.am === am) && (tl === 'ALL' || r.tl === tl) && (agent === 'ALL' || r.agent === agent));
+  let records = getBaseScopedRecords(am, tl, agent);
   if (viewMode === 'daily' && selectedDprDay) {
     records = records.filter(r => r.date === selectedDprDay);
+  } else if (viewMode === 'monthly' && selectedMonth !== null) {
+    records = records.filter(r => recordMonthIndex(r) === selectedMonth);
   }
   return records;
 }
@@ -1320,7 +1351,18 @@ function getDayScopedRecords() {
   if (viewMode === 'daily' && selectedDprDay) {
     return ALL_RECORDS.filter(r => r.date === selectedDprDay);
   }
+  if (viewMode === 'monthly' && selectedMonth !== null) {
+    return ALL_RECORDS.filter(r => recordMonthIndex(r) === selectedMonth);
+  }
   return ALL_RECORDS;
+}
+
+function getDisplayDayRange() {
+  const days = getFullDayRange();
+  if (viewMode === 'monthly' && selectedMonth !== null) {
+    return days.filter(d => Number(d.split('/')[1]) - 1 === selectedMonth);
+  }
+  return days;
 }
 
 function computeRateStats(records) {
@@ -1458,7 +1500,7 @@ function resetToFloor() {
 }
 
 // ═══════════════════════════════════════════
-// VIEW MODE — MTD (whole month) vs Daily (DPR: single-day drilldown)
+// VIEW MODE — MTD (whole dataset) vs Monthly (single calendar month) vs Daily (DPR: single-day drilldown)
 // ═══════════════════════════════════════════
 function populateDprDaySelect() {
   const sel = document.getElementById('dprDaySelect');
@@ -1476,14 +1518,33 @@ function populateDprDaySelect() {
   if (selectedDprDay) sel.value = selectedDprDay;
 }
 
+function populateMonthSelect() {
+  const sel = document.getElementById('monthSelect');
+  const months = getAvailableMonths(); // chronological order, e.g. [6,7,8] for Jul/Aug/Sep
+  sel.innerHTML = '';
+  months.slice().reverse().forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = MONTH_NAMES[m];
+    sel.appendChild(opt);
+  });
+  if (selectedMonth === null || !months.includes(selectedMonth)) {
+    selectedMonth = months.length ? months[months.length - 1] : null;
+  }
+  if (selectedMonth !== null) sel.value = selectedMonth;
+}
+
 function updatePeriodLabel() {
   const el = document.getElementById('hdrPeriod');
-  el.textContent = (viewMode === 'daily' && selectedDprDay) ? `Report Period: DPR — ${selectedDprDay}` : 'Report Period: MTD';
+  if (viewMode === 'daily' && selectedDprDay) el.textContent = `Report Period: DPR — ${selectedDprDay}`;
+  else if (viewMode === 'monthly' && selectedMonth !== null) el.textContent = `Report Period: ${MONTH_NAMES[selectedMonth]}`;
+  else el.textContent = 'Report Period: MTD';
 }
 
 function toggleMultiDaySections() {
+  // A single day (DPR) has no meaningful multi-day trend; a whole month still does, just scoped to it.
   const hide = viewMode === 'daily';
-  ['trendSectionWrap', 'pctTrendSectionWrap', 'periodComparisonWrap'].forEach(id => {
+  ['trendSectionWrap', 'pctTrendSectionWrap'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = hide ? 'none' : '';
   });
@@ -1493,9 +1554,12 @@ function toggleMultiDaySections() {
 function setViewMode(mode) {
   viewMode = mode;
   document.getElementById('vmMtdBtn').classList.toggle('active', mode === 'mtd');
+  document.getElementById('vmMonthlyBtn').classList.toggle('active', mode === 'monthly');
   document.getElementById('vmDailyBtn').classList.toggle('active', mode === 'daily');
+  document.getElementById('monthSelect').style.display = mode === 'monthly' ? 'inline-block' : 'none';
   document.getElementById('dprDaySelect').style.display = mode === 'daily' ? 'inline-block' : 'none';
   if (mode === 'daily' && !selectedDprDay) populateDprDaySelect();
+  if (mode === 'monthly') populateMonthSelect();
   updatePeriodLabel();
   toggleMultiDaySections();
   if (ALL_RECORDS.length) applyFilters();
@@ -1503,6 +1567,12 @@ function setViewMode(mode) {
 
 function onDprDayChange(day) {
   selectedDprDay = day;
+  updatePeriodLabel();
+  applyFilters();
+}
+
+function onMonthChange(m) {
+  selectedMonth = Number(m);
   updatePeriodLabel();
   applyFilters();
 }
@@ -1543,6 +1613,7 @@ function drillToTl(am, tl) {
 function applyFilters() {
   updateBreadcrumb();
   const scoped = getScopedRecords(currentAM, currentTL, currentAgent);
+  const baseScoped = getBaseScopedRecords(currentAM, currentTL, currentAgent); // ignores the Daily/Monthly drill — used by the always-on overview widgets below
   const dsatCases = scoped.filter(r => r.rate === 1);
   // Compute these once and reuse everywhere below instead of recomputing per-section (perf fix)
   const faqStats = buildFaqStats(scoped).filter(f=>f.grandTotal>0);
@@ -1569,13 +1640,16 @@ function applyFilters() {
   const safeRender = (fn, label) => { try { fn(); } catch(err) { console.warn(`Dashboard render step failed (${label}):`, err); } };
 
   safeRender(() => renderKPIs(scoped, dsatCases, faqStats), 'KPIs');
+  // These are overview-level running trends — always shown regardless of Daily/Monthly drill,
+  // and always computed off the full timeline (baseScoped) so picking an old month/day elsewhere
+  // doesn't blank them out.
+  safeRender(() => renderPeriodComparisons(baseScoped), 'Period Comparison');
+  safeRender(() => renderMonthComparison(baseScoped), 'Month Comparison');
+  safeRender(() => renderAutoSummary(baseScoped), 'Auto Summary');
+  safeRender(() => renderLeaderboard(), 'Leaderboard');
   if (viewMode !== 'daily') {
     safeRender(() => renderTrend(dsatCases, scoped), 'Daily Trend');
     safeRender(() => renderPctTrend(scoped), 'CSAT/DSAT Trend');
-    safeRender(() => renderPeriodComparisons(scoped), 'Period Comparison');
-    safeRender(() => renderMonthComparison(scoped), 'Month Comparison');
-    safeRender(() => renderAutoSummary(scoped), 'Auto Summary');
-    safeRender(() => renderLeaderboard(), 'Leaderboard');
   }
   safeRender(() => renderFAQCharts(scoped, dsatCases, faqStats), 'FAQ Charts');
   safeRender(() => renderFAQList(scoped, dsatCases, faqStats), 'FAQ List');
@@ -1640,7 +1714,7 @@ function getFullDayRange() {
 
 function renderTrend(dsatCases, scoped) {
   const daily = groupCount(dsatCases, 'date');
-  const days = getFullDayRange();
+  const days = getDisplayDayRange();
   const counts = days.map(d=>daily[d]||0);
   const bg = counts.map(v => v>=40?'rgba(229,57,53,0.85)': v>=20?'rgba(245,124,0,0.75)': v>=10?'rgba(255,193,7,0.7)': v>0?'rgba(100,181,246,0.6)':'rgba(40,45,70,0.5)');
 
@@ -3407,6 +3481,7 @@ function applyNewRecords(records, sourceLabel) {
   rebuildAmSelect();
   rebuildTlSelect();
   populateDprDaySelect();
+  populateMonthSelect();
 
   // Reveal the container BEFORE rendering (not after) — sticky-positioned table headers and
   // charts compute their layout incorrectly if built while the parent is display:none.

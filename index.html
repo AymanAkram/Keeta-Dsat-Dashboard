@@ -1359,10 +1359,15 @@ function computeRateStats(records) {
   return { counts, grandTotal, dsatPct, csatPct };
 }
 
-function buildHierarchy() {
+function buildHierarchy(sourceRecords) {
+  // Scoped to the currently active time window (MTD / a specific month / a specific
+  // day) instead of ALL_RECORDS, so a reassigned Team Leader only shows up under the
+  // Account Manager they actually belonged to during that period — not every AM
+  // they've ever been tagged with across the sheet's full history.
+  const source = sourceRecords || getDayScopedRecords();
   hierarchy = {};
   tlAgents = {};
-  ALL_RECORDS.forEach(r => {
+  source.forEach(r => {
     if (!hierarchy[r.am]) hierarchy[r.am] = new Set();
     hierarchy[r.am].add(r.tl);
     const key = r.am + '|' + r.tl;
@@ -1371,18 +1376,44 @@ function buildHierarchy() {
   });
 }
 
+// Recompute the AM/TL/Agent hierarchy for whatever time window is currently active
+// (MTD / selected month / selected day), then rebuild the three dropdowns from it.
+// Call this any time ALL_RECORDS changes OR the time-window selection changes.
+function refreshFilterScope() {
+  const scoped = getDayScopedRecords();
+  buildHierarchy(scoped);
+
+  // If the current AM/TL/Agent selection doesn't exist within this time window
+  // anymore, fall back to the nearest valid broader level instead of silently
+  // showing an empty/stale list.
+  if (currentAM !== 'ALL' && !hierarchy[currentAM]) {
+    currentAM = 'ALL';
+    currentTL = 'ALL';
+    currentAgent = 'ALL';
+  } else if (currentTL !== 'ALL' && !(hierarchy[currentAM] && hierarchy[currentAM].has(currentTL))) {
+    currentTL = 'ALL';
+    currentAgent = 'ALL';
+  } else if (currentAgent !== 'ALL' && !(tlAgents[currentAM + '|' + currentTL] && tlAgents[currentAM + '|' + currentTL].has(currentAgent))) {
+    currentAgent = 'ALL';
+  }
+
+  rebuildAmSelect(scoped);
+  rebuildTlSelect(scoped);
+}
+
 // ═══════════════════════════════════════════
 // FILTER SELECT POPULATION
 // ═══════════════════════════════════════════
-function rebuildAmSelect() {
+function rebuildAmSelect(scopedRecords) {
+  const scoped = scopedRecords || getDayScopedRecords();
   const sel = document.getElementById('amSelect');
   sel.innerHTML = '';
   const allOpt = document.createElement('option');
   allOpt.value = 'ALL';
-  allOpt.textContent = `🌐 Whole Floor — ${ALL_RECORDS.length} records`;
+  allOpt.textContent = `🌐 Whole Floor — ${scoped.length} records`;
   sel.appendChild(allOpt);
   const amStats = {};
-  ALL_RECORDS.forEach(r => { amStats[r.am] = (amStats[r.am]||0)+1; });
+  scoped.forEach(r => { amStats[r.am] = (amStats[r.am]||0)+1; });
   Object.keys(amStats).sort((a,b)=>amStats[b]-amStats[a]).forEach(am => {
     const opt = document.createElement('option');
     opt.value = am;
@@ -1392,7 +1423,8 @@ function rebuildAmSelect() {
   sel.value = currentAM;
 }
 
-function rebuildTlSelect() {
+function rebuildTlSelect(scopedRecords) {
+  const scoped = scopedRecords || getDayScopedRecords();
   const sel = document.getElementById('tlSelect');
   sel.innerHTML = '';
   const allOpt = document.createElement('option');
@@ -1403,13 +1435,13 @@ function rebuildTlSelect() {
     allOpt.textContent = 'All Teams';
     sel.disabled = true;
     sel.value = 'ALL';
-    rebuildAgentSelect();
+    rebuildAgentSelect(scoped);
     return;
   }
   sel.disabled = false;
   const tls = Array.from(hierarchy[currentAM] || []);
   const tlStats = {};
-  ALL_RECORDS.filter(r=>r.am===currentAM).forEach(r => { tlStats[r.tl] = (tlStats[r.tl]||0)+1; });
+  scoped.filter(r=>r.am===currentAM).forEach(r => { tlStats[r.tl] = (tlStats[r.tl]||0)+1; });
   allOpt.textContent = `All ${currentAM} Teams`;
   tls.sort((a,b)=>(tlStats[b]||0)-(tlStats[a]||0)).forEach(tl => {
     const opt = document.createElement('option');
@@ -1418,10 +1450,11 @@ function rebuildTlSelect() {
     sel.appendChild(opt);
   });
   sel.value = currentTL;
-  rebuildAgentSelect();
+  rebuildAgentSelect(scoped);
 }
 
-function rebuildAgentSelect() {
+function rebuildAgentSelect(scopedRecords) {
+  const scoped = scopedRecords || getDayScopedRecords();
   const sel = document.getElementById('agentSelect');
   sel.innerHTML = '';
   const allOpt = document.createElement('option');
@@ -1438,7 +1471,7 @@ function rebuildAgentSelect() {
   const key = currentAM + '|' + currentTL;
   const agents = Array.from(tlAgents[key] || []);
   const agentStats = {};
-  ALL_RECORDS.filter(r=>r.am===currentAM && r.tl===currentTL).forEach(r => { agentStats[r.agent] = (agentStats[r.agent]||0)+1; });
+  scoped.filter(r=>r.am===currentAM && r.tl===currentTL).forEach(r => { agentStats[r.agent] = (agentStats[r.agent]||0)+1; });
   allOpt.textContent = `All ${currentTL} Agents`;
   agents.sort((a,b)=>(agentStats[b]||0)-(agentStats[a]||0)).forEach(agent => {
     const opt = document.createElement('option');
@@ -1547,18 +1580,20 @@ function setViewMode(mode) {
   if (mode === 'monthly') populateMonthSelect();
   updatePeriodLabel();
   toggleMultiDaySections();
-  if (ALL_RECORDS.length) applyFilters();
+  if (ALL_RECORDS.length) { refreshFilterScope(); applyFilters(); }
 }
 
 function onDprDayChange(day) {
   selectedDprDay = day;
   updatePeriodLabel();
+  refreshFilterScope();
   applyFilters();
 }
 
 function onMonthChange(m) {
   selectedMonth = Number(m);
   updatePeriodLabel();
+  refreshFilterScope();
   applyFilters();
 }
 
@@ -3401,27 +3436,15 @@ document.getElementById('agentProfileOverlay').addEventListener('click', e => {
 function applyNewRecords(records, sourceLabel) {
   if (!records.length) throw new Error('No valid rows found in the source');
   ALL_RECORDS = records;
-  buildHierarchy();
   computeFullDayRange();
-
-  // Keep whatever AM/TL/Agent the user currently has selected across a refresh —
-  // only fall back to a broader level if that exact selection no longer exists
-  // in the freshly-loaded data (e.g. it was renamed/removed in the sheet).
-  if (currentAM !== 'ALL' && !hierarchy[currentAM]) {
-    currentAM = 'ALL';
-    currentTL = 'ALL';
-    currentAgent = 'ALL';
-  } else if (currentTL !== 'ALL' && !(hierarchy[currentAM] && hierarchy[currentAM].has(currentTL))) {
-    currentTL = 'ALL';
-    currentAgent = 'ALL';
-  } else if (currentAgent !== 'ALL' && !(tlAgents[currentAM + '|' + currentTL] && tlAgents[currentAM + '|' + currentTL].has(currentAgent))) {
-    currentAgent = 'ALL';
-  }
-
-  rebuildAmSelect();
-  rebuildTlSelect();
   populateDprDaySelect();
   populateMonthSelect();
+
+  // Rebuilds the AM/TL/Agent hierarchy scoped to whatever time window (MTD /
+  // month / day) is currently active, and reconciles the current selection
+  // against it (keeps it if still valid, falls back to ALL if not) instead of
+  // wiping it back to Whole Floor on every refresh.
+  refreshFilterScope();
 
   // Reveal the container BEFORE rendering (not after) — sticky-positioned table headers and
   // charts compute their layout incorrectly if built while the parent is display:none.

@@ -381,30 +381,16 @@
     .card-t { font-size:14px; font-weight:700; color:var(--subtext); margin-bottom:3px; }
     .card-s { font-size:11px; color:var(--muted); margin-bottom:16px; line-height:1.55; }
 
-    /* ============ HERO BANNER (immersive glass style, Keeta palette) ============ */
-    .hero-banner { position:relative; overflow:hidden; border-radius:var(--radius); margin:0 0 22px; padding:34px 32px; background:var(--surface2); isolation:isolate; box-shadow:var(--card-shadow); }
-    .hero-banner::before, .hero-banner::after { content:''; position:absolute; border-radius:50%; filter:blur(60px); pointer-events:none; z-index:0; }
-    .hero-banner::before { width:340px; height:340px; top:-130px; left:-90px; background:var(--keeta-yellow); opacity:.32; animation:heroDriftA 14s ease-in-out infinite; }
-    .hero-banner::after { width:300px; height:300px; bottom:-110px; right:-70px; background:var(--keeta-green); opacity:.24; animation:heroDriftB 18s ease-in-out infinite 1s; }
-    @keyframes heroDriftA { 0%,100% { transform:translate(0,0) scale(1); } 50% { transform:translate(4%,3%) scale(1.1); } }
-    @keyframes heroDriftB { 0%,100% { transform:translate(0,0) scale(1.05); } 50% { transform:translate(-5%,-3%) scale(.95); } }
-    .hero-inner { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:28px; flex-wrap:wrap; }
-    .hero-text { max-width:560px; }
-    .hero-eyebrow { display:inline-block; font-size:11px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:var(--keeta-green-dark); background:var(--keeta-yellow-bg); padding:4px 10px; border-radius:999px; margin-bottom:12px; }
-    .hero-title { font-size:clamp(20px,2.6vw,28px); font-weight:800; letter-spacing:-.02em; margin-bottom:8px; line-height:1.25; background:linear-gradient(90deg, var(--text) 35%, var(--keeta-green-dark)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-    body.theme-dark .hero-title { background:linear-gradient(90deg, var(--text) 35%, var(--keeta-green)); -webkit-background-clip:text; background-clip:text; }
-    .hero-sub { font-size:13px; color:var(--subtext); line-height:1.55; }
-    .hero-card { position:relative; width:220px; height:150px; flex-shrink:0; border-radius:18px; background:var(--glass-surface-strong); backdrop-filter:blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); border:1px solid var(--glass-border); box-shadow:0 30px 70px rgba(20,20,10,.18), inset 0 0 40px rgba(255,255,255,.04); transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:14px; text-align:center; }
-    .hero-card:hover { box-shadow:0 30px 70px rgba(20,20,10,.22), 0 0 40px var(--ring); }
-    .hero-card .hc-icon { font-size:26px; }
-    .hero-card .hc-value { font-size:25px; font-weight:800; color:var(--keeta-green-dark); }
-    .hero-card .hc-label { font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); }
-    body.theme-dark .hero-card .hc-value { color:var(--keeta-green); }
-    @media(max-width:700px) { .hero-inner { flex-direction:column; align-items:flex-start; } .hero-card { width:100%; height:110px; } }
-
-    /* Glass-glow upgrade for existing cards — Keeta-colored glow ring + subtle 3D tilt on pointer move (desktop only, added via JS) */
-    .card, .kpi-card, .hero-card { will-change:transform, box-shadow; }
-    .card:hover, .kpi-card:hover { box-shadow:var(--shadow-hover), 0 0 0 1px var(--keeta-yellow-bg), 0 0 22px var(--ring); }
+    /* Glass-glow upgrade for existing cards — Keeta-colored ambient glow ring visible at rest
+       (not just on hover), stronger on hover, plus a subtle 3D tilt on pointer move (via JS). */
+    .card, .kpi-card { will-change:transform, box-shadow; }
+    .card, .kpi-card {
+      box-shadow: var(--card-shadow), 0 0 0 1px var(--keeta-yellow-bg), 0 0 16px var(--ring);
+      transition: box-shadow .25s var(--ease), transform .18s var(--ease);
+    }
+    .card:hover, .kpi-card:hover {
+      box-shadow: var(--shadow-hover), 0 0 0 1.5px var(--keeta-yellow), 0 0 30px var(--ring);
+    }
 
     /* TREND CHART */
     .trend-card { margin-bottom:22px; }
@@ -776,22 +762,6 @@
       <select class="tl-select vm-day-select" id="dprDaySelect" style="display:none;" onchange="onDprDayChange(this.value)"></select>
     </div>
     <div class="total-badge">😠 <span id="hdrTotal">0</span> DSAT Cases</div>
-  </div>
-</div>
-
-<!-- HERO BANNER (brand-style intro, matches glass/glow aesthetic) -->
-<div class="hero-banner">
-  <div class="hero-inner">
-    <div class="hero-text">
-      <span class="hero-eyebrow">Keeta Support Floor</span>
-      <div class="hero-title">See where satisfaction is slipping — before it costs you.</div>
-      <div class="hero-sub">Live DSAT &amp; CSAT signals across every Account Manager, Team Leader, and Agent — synced straight from your Google Sheet.</div>
-    </div>
-    <div class="hero-card" id="heroStatCard">
-      <div class="hc-icon">📊</div>
-      <div class="hc-value" id="heroStatValue">—</div>
-      <div class="hc-label">DSAT Cases (MTD)</div>
-    </div>
   </div>
 </div>
 
@@ -3722,9 +3692,9 @@ function dashCloseMobileSidebar() {
   });
 })();
 
-// ── HERO / GLASS TILT: subtle cursor-follow tilt on the hero card + main
-// cards, matching the floating-screen feel of the reference style. Skipped
-// entirely on touch/coarse pointers, same as the reference component. ──
+// ── GLASS TILT: subtle cursor-follow tilt on the main cards, matching the
+// floating-screen feel of the reference style. Skipped entirely on
+// touch/coarse pointers, same as the reference component. ──
 (function initGlassTilt() {
   if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
 
@@ -3741,19 +3711,7 @@ function dashCloseMobileSidebar() {
       el.style.transform = 'perspective(900px) rotateY(0deg) rotateX(0deg) translateY(0)';
     });
   }
-  const hero = document.getElementById('heroStatCard');
-  if (hero) attachTilt(hero, 14);
   document.querySelectorAll('.kpi-card, .grid2 > .card, .grid3 > .card').forEach((el) => attachTilt(el, 4));
-})();
-
-// ── Keep the hero banner's stat pill in sync with the header total ──
-(function syncHeroStat() {
-  const hdrTotal = document.getElementById('hdrTotal');
-  const heroVal = document.getElementById('heroStatValue');
-  if (!hdrTotal || !heroVal) return;
-  const sync = () => { heroVal.textContent = hdrTotal.textContent || '—'; };
-  sync();
-  new MutationObserver(sync).observe(hdrTotal, { childList: true, characterData: true, subtree: true });
 })();
 </script>
 </body>

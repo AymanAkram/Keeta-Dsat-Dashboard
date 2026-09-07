@@ -59,6 +59,7 @@
     /* Decorative blurred colour blobs behind everything — this is what the glass panels
        reveal a soft hint of through their frosted, translucent backgrounds */
     .bg-blobs { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+    #spotlightCursor { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; }
     .bg-blobs span { position:absolute; border-radius:50%; filter:blur(70px); opacity:.35; }
     .bg-blobs span:nth-child(1) { width:520px; height:520px; top:-160px; left:-120px; background:var(--keeta-yellow); }
     .bg-blobs span:nth-child(2) { width:460px; height:460px; bottom:-140px; right:-100px; background:var(--keeta-green); opacity:.22; }
@@ -602,6 +603,8 @@
   </style>
 </head>
 <body class="theme-light">
+
+<canvas id="spotlightCursor" aria-hidden="true"></canvas>
 
 <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
 
@@ -3145,8 +3148,26 @@ function searchCaseId() {
     return;
   }
 
-  // 2. Fuzzy match — agent name or FAQ text (case-insensitive substring)
+  // 2. Agent match — searching an agent by name/id opens their full profile
+  //    directly instead of a flat list of their cases. Exact match wins;
+  //    otherwise, if the query uniquely identifies exactly one agent
+  //    (substring match against no other agent), that counts too.
   const q = query.toLowerCase();
+  const distinctAgents = [...new Set(ALL_RECORDS.map(r => r.agent).filter(Boolean))];
+  const exactAgent = distinctAgents.find(a => String(a).toLowerCase() === q);
+  if (exactAgent) {
+    openAgentProfile(exactAgent);
+    return;
+  }
+  const agentSubstringMatches = distinctAgents.filter(a => String(a).toLowerCase().includes(q));
+  if (agentSubstringMatches.length === 1) {
+    openAgentProfile(agentSubstringMatches[0]);
+    return;
+  }
+
+  // 3. Fuzzy match — agent name or FAQ text (case-insensitive substring),
+  //    falls back to a flat case list when the query doesn't pin down a
+  //    single agent (ambiguous agent match, or matches FAQ text instead).
   const matches = ALL_RECORDS.filter(r =>
     (r.agent && String(r.agent).toLowerCase().includes(q)) ||
     (r.faq && String(r.faq).toLowerCase().includes(q))
@@ -3712,6 +3733,57 @@ function dashCloseMobileSidebar() {
     });
   }
   document.querySelectorAll('.kpi-card, .grid2 > .card, .grid3 > .card').forEach((el) => attachTilt(el, 4));
+})();
+
+// ── SPOTLIGHT CURSOR: soft radial glow that follows the mouse, ported
+// from the reference React canvas hook to plain canvas + JS since this
+// project is vanilla HTML/JS (no React/Tailwind/shadcn here). Skipped on
+// touch/coarse-pointer devices, where there's no real cursor to follow. ──
+(function initSpotlightCursor() {
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+
+  const canvas = document.getElementById('spotlightCursor');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const config = {
+    radius: 220,
+    brightness: 0.14,
+    color: getComputedStyle(document.documentElement).getPropertyValue('--keeta-yellow').trim() || '#ffd400'
+  };
+
+  let mouseX = -1000, mouseY = -1000;
+  let rafId = 0;
+
+  function hexToRgb(hex) {
+    const clean = hex.replace('#', '');
+    const bigint = parseInt(clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean, 16);
+    return `${(bigint >> 16) & 255},${(bigint >> 8) & 255},${bigint & 255}`;
+  }
+  const rgbColor = hexToRgb(config.color);
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (mouseX !== -1000 && mouseY !== -1000) {
+      const gradient = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, config.radius);
+      gradient.addColorStop(0, `rgba(${rgbColor}, ${config.brightness})`);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    rafId = requestAnimationFrame(draw);
+  }
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+  window.addEventListener('mouseleave', () => { mouseX = -1000; mouseY = -1000; });
+  rafId = requestAnimationFrame(draw);
 })();
 </script>
 </body>
